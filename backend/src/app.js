@@ -3,6 +3,7 @@ import cors from 'cors';
 import healthRoutes from './routes/healthRoutes.js';
 import ambulanceRoutes from './routes/ambulanceRoutes.js';
 import hospitalRoutes from './routes/hospitalRoutes.js';
+import emergencyRoutes from './routes/emergencyRoutes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorMiddleware.js';
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use('/api/health', healthRoutes);
 app.use('/api/ambulance', ambulanceRoutes);
 app.use('/api/hospital', hospitalRoutes);
+app.use('/api/emergency', emergencyRoutes);
 
 // Catch-all for undefined routes
 app.use(notFoundHandler);
