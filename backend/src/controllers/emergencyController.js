@@ -306,3 +306,133 @@ export const createEmergencyRequest = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Edit Emergency Requirements
+ * PUT /api/emergency/:id 
+ */
+export const updateEmergencyRequest = async (req, res, next) => {
+  try {
+    const ambulanceId = req.user?._id;
+
+    if (!ambulanceId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticated ambulance ID is missing'
+      });
+    }
+
+    const { id } = req.params; // id -> mongoose _id
+    const { confirmedRequirements } = req.body;
+
+    if (!confirmedRequirements) {
+      return res.status(400).json({
+        success: false,
+        message: 'confirmedRequirements is required'
+      });
+    }
+
+    const emergencyRequest = await EmergencyRequest.findById(id);
+
+    if (!emergencyRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Emergency request not found'
+      });
+    }
+
+    if (emergencyRequest.status !== 'PARSED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only parsed emergency requests can be edited'
+      });
+    }
+
+    emergencyRequest.confirmedRequirements = confirmedRequirements;
+
+    await emergencyRequest.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Emergency requirements updated successfully',
+      data: emergencyRequest.toJSON()
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Cancel Emergency Request
+ * DELETE /api/emergency/:id
+ */
+export const cancelEmergencyRequest = async (req, res, next) => {
+  try {
+    // ----------------------------------
+    // 1. Get authenticated ambulance ID
+    // ----------------------------------
+
+    const ambulanceId = req.user?._id;
+
+    if (!ambulanceId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticated ambulance ID is missing'
+      });
+    }
+
+    // ----------------------------------
+    // 2. Get emergency MongoDB _id
+    // ----------------------------------
+
+    const { id } = req.params;
+
+    // ----------------------------------
+    // 3. Find request belonging to ambulance
+    // ----------------------------------
+
+    const emergencyRequest = await EmergencyRequest.findById( id );
+
+    if (!emergencyRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Emergency request not found'
+      });
+    }
+
+    // ----------------------------------
+    // 4. Only PARSED requests can be cancelled
+    // ----------------------------------
+
+    if (emergencyRequest.status !== 'PARSED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only parsed emergency requests can be cancelled'
+      });
+    }
+
+    // ----------------------------------
+    // 5. Mark request as cancelled
+    // ----------------------------------
+
+    emergencyRequest.status = 'CANCELLED';
+
+    // ----------------------------------
+    // 6. Save
+    // ----------------------------------
+
+    await emergencyRequest.save();
+
+    // ----------------------------------
+    // 7. Return updated request
+    // ----------------------------------
+
+    return res.status(200).json({
+      success: true,
+      message: 'Emergency request cancelled successfully',
+      data: emergencyRequest.toJSON()
+    });
+  } catch (error) {
+    next(error);
+  }
+};

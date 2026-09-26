@@ -245,6 +245,7 @@ const emergencyRequestSchema = new mongoose.Schema(
       type: String,
       enum: [
         'PARSED',
+        'CANCELLED',
         'CONFIRMED',
         'SEARCHING_HOSPITAL',
         'HOSPITALS_PINGED',
@@ -272,7 +273,6 @@ emergencyRequestSchema.index({ location: '2dsphere' });
 
 emergencyRequestSchema.set('toJSON', {
   transform: (doc, ret) => {
-    delete ret._id;
     delete ret.__v;
 
     return ret;
