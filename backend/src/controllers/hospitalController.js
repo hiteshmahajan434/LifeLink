@@ -2,6 +2,7 @@ import Hospital from '../models/Hospital.js';
 import { generateHospitalId } from '../utils/counterService.js';
 import { hashPassword, comparePassword } from '../utils/passwordService.js';
 import { signToken } from '../utils/jwtService.js';
+import HospitalResource from '../models/HospitalResource.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -32,7 +33,7 @@ const validateResources = (resources) => {
   const numberFields = ['icuBeds', 'traumaBeds', 'generalBeds', 'ventilators'];
   for (const field of numberFields) {
     if (resources[field] !== undefined) {
-      if (typeof resources[field] !== 'number' || isNaN(resources[field]) || resources[field] < 0) {
+      if (!Number.isInteger(resources[field]) || resources[field] < 0) {
         return `${field} must be a non-negative number`;
       }
     }
@@ -125,16 +126,38 @@ export const registerHospital = async (req, res, next) => {
       location: {
         type: 'Point',
         coordinates: location.coordinates
-      },
-      resources: {
-        icuBeds: resources.icuBeds ?? 0,
-        traumaBeds: resources.traumaBeds ?? 0,
-        generalBeds: resources.generalBeds ?? 0,
-        ventilators: resources.ventilators ?? 0,
-        oxygenSupply: resources.oxygenSupply ?? false,
-        bloodBank: resources.bloodBank ?? false
       }
     });
+
+    const hospitalResource = await HospitalResource.create({
+      hospitalId: hospital._id,
+      icuBeds: {
+        total: resources.icuBeds ?? 0,
+        occupied: 0,
+        reserved: 0
+      },
+      traumaBeds: {
+        total: resources.traumaBeds ?? 0,
+        occupied: 0,
+        reserved: 0
+      },
+      generalBeds: {
+        total: resources.generalBeds ?? 0,
+        occupied: 0,
+        reserved: 0
+      },
+      ventilators: {
+        total: resources.ventilators ?? 0,
+        occupied: 0,
+        reserved: 0
+      },
+      oxygenSupply: resources.oxygenSupply ?? false,
+      bloodBank: resources.bloodBank ?? false
+    });
+
+    hospital.resourceId = hospitalResource._id;
+
+    await hospital.save();
 
     // Generate JWT with Mongoose document _id
     const token = signToken({ _id: hospital._id, id: hospital.id, role: 'HOSPITAL' });

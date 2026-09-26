@@ -8,49 +8,24 @@ const pointSchema = new mongoose.Schema(
       required: true,
       default: 'Point'
     },
+
     coordinates: {
       type: [Number], // [longitude, latitude]
       required: true,
       validate: {
         validator: function (val) {
-          return Array.isArray(val) && val.length === 2 && !isNaN(val[0]) && !isNaN(val[1]);
+          return (
+            Array.isArray(val) &&
+            val.length === 2 &&
+            typeof val[0] === 'number' &&
+            typeof val[1] === 'number' &&
+            !isNaN(val[0]) &&
+            !isNaN(val[1])
+          );
         },
-        message: 'Coordinates must be an array of two numbers: [longitude, latitude]'
+        message:
+          'Coordinates must be an array of two numbers: [longitude, latitude]'
       }
-    }
-  },
-  { _id: false }
-);
-
-const resourcesSchema = new mongoose.Schema(
-  {
-    icuBeds: {
-      type: Number,
-      default: 0,
-      min: [0, 'icuBeds cannot be negative']
-    },
-    traumaBeds: {
-      type: Number,
-      default: 0,
-      min: [0, 'traumaBeds cannot be negative']
-    },
-    generalBeds: {
-      type: Number,
-      default: 0,
-      min: [0, 'generalBeds cannot be negative']
-    },
-    ventilators: {
-      type: Number,
-      default: 0,
-      min: [0, 'ventilators cannot be negative']
-    },
-    oxygenSupply: {
-      type: Boolean,
-      default: false
-    },
-    bloodBank: {
-      type: Boolean,
-      default: false
     }
   },
   { _id: false }
@@ -58,17 +33,21 @@ const resourcesSchema = new mongoose.Schema(
 
 const hospitalSchema = new mongoose.Schema(
   {
+    // Public hospital ID
+    // Example: HOSP-100
     id: {
       type: String,
       required: true,
       unique: true,
       trim: true
     },
+
     name: {
       type: String,
       required: [true, 'Name is required'],
       trim: true
     },
+
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -76,27 +55,35 @@ const hospitalSchema = new mongoose.Schema(
       lowercase: true,
       trim: true
     },
+
     phone: {
       type: String,
       required: [true, 'Phone number is required'],
       trim: true
     },
+
     password: {
       type: String,
       required: [true, 'Password is required']
     },
+
     address: {
       type: String,
       required: [true, 'Address is required'],
       trim: true
     },
+
     location: {
       type: pointSchema,
       required: [true, 'Location is required']
     },
-    resources: {
-      type: resourcesSchema,
-      default: () => ({})
+
+    // Reference to HospitalResource document
+    resourceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'HospitalResource',
+      unique: true,
+      sparse: true
     }
   },
   {
@@ -104,10 +91,10 @@ const hospitalSchema = new mongoose.Schema(
   }
 );
 
-// 2dsphere index on location for geospatial queries
+// 2dsphere index for nearby hospital queries
 hospitalSchema.index({ location: '2dsphere' });
 
-// Ensure password is never included in JSON output
+// Never return password in JSON
 hospitalSchema.set('toJSON', {
   transform: (doc, ret) => {
     delete ret.password;
