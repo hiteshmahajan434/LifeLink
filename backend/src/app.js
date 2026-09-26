@@ -4,6 +4,7 @@ import healthRoutes from './routes/healthRoutes.js';
 import ambulanceRoutes from './routes/ambulanceRoutes.js';
 import hospitalRoutes from './routes/hospitalRoutes.js';
 import emergencyRoutes from './routes/emergencyRoutes.js';
+import hospitalResourceRoutes from './routes/hospitalResourceRoutes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorMiddleware.js';
 
 const app = express();
@@ -17,6 +18,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/ambulance', ambulanceRoutes);
 app.use('/api/hospital', hospitalRoutes);
 app.use('/api/emergency', emergencyRoutes);
+app.use('/api/hospital/resources', hospitalResourceRoutes);
 
 // Catch-all for undefined routes
 app.use(notFoundHandler);
