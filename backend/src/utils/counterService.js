@@ -16,11 +16,17 @@ export const initCounters = async () => {
     { $setOnInsert: { seq: 99 } },
     { upsert: true }
   );
+
+  await Counter.updateOne(
+    { _id: 'emergency' },
+    { $setOnInsert: { seq: 99 } },
+    { upsert: true }
+  );
 };
 
 /**
  * Atomically increments sequence number for the specified sequence name.
- * @param {string} sequenceName - 'ambulance' or 'hospital'
+ * @param {string} sequenceName - 'ambulance', 'hospital', or 'emergency'
  * @returns {Promise<number>} - Resulting sequence number
  */
 export const getNextSequence = async (sequenceName) => {
@@ -68,3 +74,13 @@ export const generateHospitalId = async () => {
   const seq = await getNextSequence('hospital');
   return `HOSP-${seq}`;
 };
+
+/**
+ * Atomically generates next Emergency ID (e.g. EMG-100, EMG-101)
+ * @returns {Promise<string>}
+ */
+export const generateEmergencyId = async () => {
+  const seq = await getNextSequence('emergency');
+  return `EMG-${seq}`;
+};
+
