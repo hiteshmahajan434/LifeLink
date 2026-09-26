@@ -1,6 +1,7 @@
 import EmergencyRequest from '../models/EmergencyRequest.js';
 import { generateEmergencyId } from '../utils/counterService.js';
 import { parseEmergencyRequirements } from '../services/aiParserService.js';
+import { startHospitalMatching } from '../services/hospitalMatchingService.js';
 
 const EMERGENCY_TYPES = [
   'ROAD_ACCIDENT',
@@ -432,6 +433,184 @@ export const cancelEmergencyRequest = async (req, res, next) => {
       message: 'Emergency request cancelled successfully',
       data: emergencyRequest.toJSON()
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Confirm Emergency Request
+ *
+ * POST /api/emergency/:id/confirm
+ */
+export const confirmEmergencyRequest = async (
+  req,
+  res,
+  next
+) => {
+  try {
+
+    // ----------------------------------
+    // 1. Get authenticated ambulance
+    // ----------------------------------
+
+    const ambulanceId =
+      req.user?._id;
+
+    if (!ambulanceId) {
+      return res.status(401).json({
+        success: false,
+        message:
+          'Authenticated ambulance ID is missing'
+      });
+    }
+
+
+    // ----------------------------------
+    // 2. Get emergency ID
+    // ----------------------------------
+
+    const { id } = req.params;
+
+
+    // ----------------------------------
+    // 3. Find emergency
+    // ----------------------------------
+
+    const emergencyRequest =
+      await EmergencyRequest.findById(id);
+
+    if (!emergencyRequest) {
+      return res.status(404).json({
+        success: false,
+        message:
+          'Emergency request not found'
+      });
+    }
+
+
+    // ----------------------------------
+    // 4. Verify ownership
+    // ----------------------------------
+
+    if (
+      emergencyRequest.ambulanceId.toString() !==
+      ambulanceId.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'You are not authorized to confirm this emergency request'
+      });
+    }
+
+
+    // ----------------------------------
+    // 5. Check status
+    // ----------------------------------
+
+    if (
+      emergencyRequest.status !== 'PARSED'
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Only parsed emergency requests can be confirmed'
+      });
+    }
+
+
+    // ----------------------------------
+    // 6. Check confirmed requirements
+    // ----------------------------------
+
+    if (
+      !emergencyRequest.confirmedRequirements
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Confirmed emergency requirements are missing'
+      });
+    }
+
+
+    // ----------------------------------
+    // 7. Change status
+    // ----------------------------------
+
+    emergencyRequest.status =
+      'SEARCHING_HOSPITAL';
+
+    await emergencyRequest.save();
+
+
+    // ----------------------------------
+    // 8. Start hospital matching
+    // ----------------------------------
+
+    const matchingResult =
+      await startHospitalMatching(
+        emergencyRequest
+      );
+
+
+    // ----------------------------------
+    // 9. No suitable hospital
+    // ----------------------------------
+
+    if (!matchingResult.success) {
+
+      // Return emergency to CONFIRMED
+      // because matching did not find
+      // any suitable hospital yet.
+
+      emergencyRequest.status =
+        'CONFIRMED';
+
+      await emergencyRequest.save();
+
+      return res.status(404).json({
+        success: false,
+        message:
+          matchingResult.message,
+        data: {
+          emergency:
+            emergencyRequest.toJSON()
+        }
+      });
+    }
+
+
+    // ----------------------------------
+    // 10. Hospitals successfully pinged
+    // ----------------------------------
+
+    emergencyRequest.status =
+      'HOSPITALS_PINGED';
+
+    await emergencyRequest.save();
+
+
+    // ----------------------------------
+    // 11. Response
+    // ----------------------------------
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        'Emergency confirmed and hospitals have been pinged',
+
+      data: {
+        emergency:
+          emergencyRequest.toJSON(),
+
+        hospitals:
+          matchingResult.selectedHospitals
+      }
+    });
+
   } catch (error) {
     next(error);
   }
