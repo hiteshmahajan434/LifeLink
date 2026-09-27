@@ -254,7 +254,13 @@ const emergencyRequestSchema = new mongoose.Schema(
       ],
       default: 'PARSED',
       required: true
-    }
+    }, 
+    
+    assignedHospital: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Hospital',
+      default: null
+    },
   },
   {
     timestamps: true

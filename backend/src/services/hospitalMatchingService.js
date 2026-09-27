@@ -1,15 +1,16 @@
 import Hospital from '../models/Hospital.js';
 import HospitalResource from '../models/HospitalResource.js';
 import HospitalEmergencyRequest from '../models/HospitalEmergencyRequest.js';
+import EmergencyRequest from '../models/EmergencyRequest.js';
 
 const BATCH_SIZE = 2;
 
+const HOSPITAL_RESPONSE_WINDOW_MS = 60 * 1000;
 
-/**
- * Check whether a hospital has all required resources.
- *
- * available = total - occupied - reserved
- */
+// --------------------------------------------------
+// Check whether hospital has required resources
+// --------------------------------------------------
+
 const hasRequiredResources = (
   hospitalResource,
   requiredResources
@@ -29,7 +30,8 @@ const hasRequiredResources = (
       continue;
     }
 
-    const resource = hospitalResource[resourceType];
+    const resource =
+      hospitalResource[resourceType];
 
     if (!resource) {
       return false;
@@ -45,7 +47,6 @@ const hasRequiredResources = (
     }
   }
 
-  // Oxygen requirement
   if (
     requiredResources.oxygenSupply === true &&
     hospitalResource.oxygenSupply !== true
@@ -53,7 +54,6 @@ const hasRequiredResources = (
     return false;
   }
 
-  // Blood bank requirement
   if (
     requiredResources.bloodBank === true &&
     hospitalResource.bloodBank !== true
@@ -64,21 +64,19 @@ const hasRequiredResources = (
   return true;
 };
 
+// --------------------------------------------------
+// Calculate distance
+// --------------------------------------------------
 
-/**
- * Calculate distance between two GeoJSON points.
- *
- * coordinates format:
- * [longitude, latitude]
- *
- * Returns distance in kilometres.
- */
 const calculateDistanceInKm = (
   emergencyCoordinates,
   hospitalCoordinates
 ) => {
-  const [longitude1, latitude1] = emergencyCoordinates;
-  const [longitude2, latitude2] = hospitalCoordinates;
+  const [longitude1, latitude1] =
+    emergencyCoordinates;
+
+  const [longitude2, latitude2] =
+    hospitalCoordinates;
 
   const earthRadiusKm = 6371;
 
@@ -110,30 +108,24 @@ const calculateDistanceInKm = (
   return earthRadiusKm * c;
 };
 
+// --------------------------------------------------
+// Create next hospital batch
+// --------------------------------------------------
 
-/**
- * Find eligible hospitals, rank them,
- * and create the first batch of hospital requests.
- */
-export const startHospitalMatching = async (
-  emergency
+export const createHospitalBatch  = async (
+  emergency,
+  batchNumber
 ) => {
-
   const requiredResources =
     emergency.confirmedRequirements.requiredResources;
 
   const emergencyCoordinates =
     emergency.location.coordinates;
 
-
-  // ----------------------------------
-  // 1. Get hospitals
-  // ----------------------------------
-
+  // Get all hospitals
   const hospitals = await Hospital.find({
     location: { $exists: true }
   }).lean();
-
 
   if (hospitals.length === 0) {
     return {
@@ -143,13 +135,27 @@ export const startHospitalMatching = async (
     };
   }
 
+  // Find hospitals already contacted
+  const previousRequests =
+    await HospitalEmergencyRequest.find({
+      emergencyId: emergency._id
+    })
+      .select('hospitalId')
+      .lean();
 
-  // ----------------------------------
-  // 2. Get resources
-  // ----------------------------------
+  const contactedHospitalIds =
+    new Set(
+      previousRequests.map(
+        request =>
+          request.hospitalId.toString()
+      )
+    );
 
+  // Get hospital resources
   const hospitalIds =
-    hospitals.map((hospital) => hospital._id);
+    hospitals.map(
+      hospital => hospital._id
+    );
 
   const hospitalResources =
     await HospitalResource.find({
@@ -158,8 +164,6 @@ export const startHospitalMatching = async (
       }
     }).lean();
 
-
-  // Create quick lookup map
   const resourceMap = new Map();
 
   for (const resource of hospitalResources) {
@@ -169,120 +173,109 @@ export const startHospitalMatching = async (
     );
   }
 
-
-  // ----------------------------------
-  // 3. Filter eligible hospitals
-  // ----------------------------------
-
   const eligibleHospitals = [];
 
+  // Find eligible hospitals
   for (const hospital of hospitals) {
+    // Do not contact the same hospital again
+    if (
+      contactedHospitalIds.has(
+        hospital._id.toString()
+      )
+    ) {
+      continue;
+    }
 
     const resource =
       resourceMap.get(
         hospital._id.toString()
       );
 
-    // Hospital has no resource document
     if (!resource) {
       continue;
     }
 
-
-    // Check resource availability
-    const isEligible =
+    const eligible =
       hasRequiredResources(
         resource,
         requiredResources
       );
 
-    if (!isEligible) {
+    if (!eligible) {
       continue;
     }
 
-
-    // Calculate distance
     const distanceKm =
       calculateDistanceInKm(
         emergencyCoordinates,
         hospital.location.coordinates
       );
 
-
     eligibleHospitals.push({
       hospital,
-      resource,
       distanceKm
     });
   }
 
-
-  // ----------------------------------
-  // 4. Rank hospitals
-  // ----------------------------------
-
-  // MVP ranking:
-  // nearest eligible hospital first
-
+  // Nearest hospitals first
   eligibleHospitals.sort(
     (a, b) =>
       a.distanceKm - b.distanceKm
   );
+
   console.log(eligibleHospitals);
 
-
-  // ----------------------------------
-  // 5. Select first batch
-  // ----------------------------------
-
+  // Select next batch
   const selectedHospitals =
     eligibleHospitals.slice(
       0,
       BATCH_SIZE
     );
 
-
-  if (selectedHospitals.length === 0) {
+  if (
+    selectedHospitals.length === 0
+  ) {
     return {
       success: false,
       message:
-        'No suitable hospitals found for the required resources',
+        'No more suitable hospitals available',
       selectedHospitals: []
     };
   }
 
+  const sentAt = new Date();
 
-  // ----------------------------------
-  // 6. Create hospital requests
-  // ----------------------------------
+  const expiresAt = new Date(
+    sentAt.getTime() +
+      HOSPITAL_RESPONSE_WINDOW_MS
+  );
 
   const hospitalRequests =
     await HospitalEmergencyRequest.insertMany(
       selectedHospitals.map(
         ({ hospital }) => ({
-          emergencyId: emergency._id,
+          emergencyId:
+            emergency._id,
 
-          hospitalId: hospital._id,
+          hospitalId:
+            hospital._id,
 
           status: 'PENDING',
 
-          batchNumber: 1,
+          batchNumber,
 
-          sentAt: new Date()
+          sentAt,
+
+          expiresAt
         })
       )
     );
-
-
-  // ----------------------------------
-  // 7. Return selected hospitals
-  // ----------------------------------
 
   return {
     success: true,
 
     message:
-      'Hospital requests created successfully',
+      `Hospital batch ${batchNumber} created successfully`,
 
     selectedHospitals:
       selectedHospitals.map(
@@ -301,11 +294,157 @@ export const startHospitalMatching = async (
               item.distanceKm.toFixed(2)
             ),
 
-          batchNumber: 1,
+          batchNumber,
 
           hospitalRequestId:
-            hospitalRequests[index]._id
+            hospitalRequests[index]._id,
+
+          expiresAt
         })
       )
   };
 };
+
+// --------------------------------------------------
+// Check whether the current batch is finished
+// --------------------------------------------------
+
+export const checkBatchAndCreateNext =
+  async (
+    emergencyId,
+    batchNumber
+  ) => {
+    const emergency =
+      await EmergencyRequest.findById(
+        emergencyId
+      );
+
+    if (!emergency) {
+      return {
+        success: false,
+        message: 'Emergency not found'
+      };
+    }
+
+    // Someone already accepted
+    if (emergency.assignedHospital) {
+      return {
+        success: false,
+        message:
+          'Emergency already assigned to a hospital'
+      };
+    }
+
+    // Get current batch
+    const batchRequests =
+      await HospitalEmergencyRequest.find({
+        emergencyId,
+        batchNumber
+      });
+
+    if (batchRequests.length === 0) {
+      return {
+        success: false,
+        message: 'Hospital batch not found'
+      };
+    }
+
+    // If any hospital is still pending,
+    // do not create next batch
+    const hasPending =
+      batchRequests.some(
+        request =>
+          request.status === 'PENDING'
+      );
+
+    if (hasPending) {
+      return {
+        success: false,
+        message:
+          'Current batch still has pending requests'
+      };
+    }
+
+    // All hospitals have responded
+    const nextBatchNumber =
+      batchNumber + 1;
+
+    const nextBatch =
+      await createHospitalBatch(
+        emergency,
+        nextBatchNumber
+      );
+
+    if (!nextBatch.success) {
+      emergency.status = 'CONFIRMED';
+
+      await emergency.save();
+
+      return nextBatch;
+    }
+
+    emergency.status =
+      'HOSPITALS_PINGED';
+
+    await emergency.save();
+
+    return nextBatch;
+  };
+
+// --------------------------------------------------
+// Expire requests whose 1-minute window ended
+// --------------------------------------------------
+
+export const processExpiredHospitalRequests =
+  async () => {
+    const now = new Date();
+
+    const expiredRequests =
+      await HospitalEmergencyRequest.find({
+        status: 'PENDING',
+        expiresAt: {
+          $lte: now
+        }
+      });
+
+    const affectedBatches = new Map();
+
+    for (const request of expiredRequests) {
+      request.status = 'EXPIRED';
+      request.respondedAt = now;
+
+      await request.save();
+
+      const key =
+        `${request.emergencyId.toString()}_${request.batchNumber}`;
+
+      affectedBatches.set(
+        key,
+        {
+          emergencyId:
+            request.emergencyId,
+          batchNumber:
+            request.batchNumber
+        }
+      );
+    }
+
+    // Check affected batches
+    for (
+      const {
+        emergencyId,
+        batchNumber
+      } of affectedBatches.values()
+    ) {
+      await checkBatchAndCreateNext(
+        emergencyId,
+        batchNumber
+      );
+    }
+
+    return {
+      success: true,
+      expiredCount:
+        expiredRequests.length
+    };
+  };

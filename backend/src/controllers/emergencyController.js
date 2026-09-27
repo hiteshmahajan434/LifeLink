@@ -1,7 +1,7 @@
 import EmergencyRequest from '../models/EmergencyRequest.js';
 import { generateEmergencyId } from '../utils/counterService.js';
 import { parseEmergencyRequirements } from '../services/aiParserService.js';
-import { startHospitalMatching } from '../services/hospitalMatchingService.js';
+import { createHospitalBatch  } from '../services/hospitalMatchingService.js';
 
 const EMERGENCY_TYPES = [
   'ROAD_ACCIDENT',
@@ -550,8 +550,9 @@ export const confirmEmergencyRequest = async (
     // ----------------------------------
 
     const matchingResult =
-      await startHospitalMatching(
-        emergencyRequest
+      await createHospitalBatch (
+        emergencyRequest,
+        1
       );
 
 
