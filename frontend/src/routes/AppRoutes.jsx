@@ -7,6 +7,7 @@ import {
 
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
+import EmergencyRequest from "../pages/EmergencyRequest";
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem("token");
@@ -40,6 +41,15 @@ const AppRoutes = () => {
           path="*"
           element={<Navigate to="/login" replace />}
         />
+
+        {/* <Route
+        path="/emergency"
+        element={
+            <ProtectedRoute>
+            <EmergencyRequest />
+            </ProtectedRoute>
+        }
+        /> */}
       </Routes>
     </BrowserRouter>
   );

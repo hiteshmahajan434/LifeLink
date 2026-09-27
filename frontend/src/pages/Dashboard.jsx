@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useCurrentLocation } from "../hooks/useCurrentLocation";
 import { updateAmbulanceLocation } from "../api/auth.api";
+import { useNearbyHospitals } from "../hooks/useNearbyHospitals";
+import EmergencyMap from "../components/map/EmergencyMap";
+import EmergencyCard from "../components/emergency/EmergencyCard";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -13,29 +16,36 @@ const Dashboard = () => {
     fetchLocation,
   } = useCurrentLocation();
 
+  const {
+    hospitals,
+    loading: hospitalsLoading,
+    error: hospitalsError,
+    fetchNearbyHospitals,
+  } = useNearbyHospitals();
+
+
   const [locationUpdated, setLocationUpdated] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
     const syncLocation = async () => {
-      const currentLocation = await fetchLocation();
+        const currentLocation = await fetchLocation();
 
-      if (!currentLocation) {
+        if (!currentLocation) {
         return;
-      }
+        }
 
-      try {
+        try {
         await updateAmbulanceLocation(currentLocation);
         setLocationUpdated(true);
-      } catch (error) {
-        console.error(
-          "Failed to update ambulance location:",
-          error
-        );
-      }
+
+        await fetchNearbyHospitals(currentLocation);
+        } catch (error) {
+        console.error("Location sync failed:", error);
+        }
     };
 
     syncLocation();
-  }, [fetchLocation]);
+    }, [fetchLocation, fetchNearbyHospitals]);
 
   return (
     <div>
@@ -99,38 +109,46 @@ const Dashboard = () => {
         </section>
 
         <section>
-          <h2>Map</h2>
+        <h2>Live Map</h2>
 
-          <div
-            style={{
-              height: "400px",
-              border: "1px solid #ccc",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+        <EmergencyMap
+            ambulanceLocation={location}
+            hospitals={hospitals}
+        />
+        </section>
+
+        <EmergencyCard />
+
+        <section>
+        <h2>Nearby Hospitals</h2>
+
+        {hospitalsLoading && (
+            <p>Finding nearby hospitals...</p>
+        )}
+
+        {hospitalsError && (
+            <p>{hospitalsError}</p>
+        )}
+
+        {!hospitalsLoading && !hospitalsError && hospitals.length === 0 && (
+            <p>No hospitals found nearby.</p>
+        )}
+
+        {hospitals.map((hospital) => (
+            <div key={hospital._id}>
+            <h3>{hospital.name}</h3>
+
             <p>
-              Map will be integrated here
+                Hospital ID: {hospital.hospitalId}
             </p>
-          </div>
+
+            <p>
+                {hospital.address}
+            </p>
+            </div>
+        ))}
         </section>
 
-        <section>
-          <h2>Nearby Hospitals</h2>
-
-          <p>
-            Nearby hospitals will appear here.
-          </p>
-        </section>
-
-        <section>
-          <h2>Emergency</h2>
-
-          <button>
-            Create Emergency Request
-          </button>
-        </section>
       </main>
     </div>
   );
