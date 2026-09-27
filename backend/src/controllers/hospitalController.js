@@ -253,3 +253,201 @@ export const getHospitalProfile = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Update Authenticated Hospital Profile
+ * PATCH /api/hospital/profile
+ */
+export const updateHospitalProfile = async (req, res, next) => {
+  try {
+    const hospital = await Hospital.findById(req.user._id);
+
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hospital profile not found'
+      });
+    }
+
+    const {
+      name,
+      email,
+      phone,
+      address,
+      location
+    } = req.body;
+
+    // At least one field must be provided
+    if (
+      name === undefined &&
+      email === undefined &&
+      phone === undefined &&
+      address === undefined &&
+      location === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one profile field is required'
+      });
+    }
+
+    // Name
+    if (name !== undefined) {
+      if (
+        typeof name !== 'string' ||
+        !name.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name must be a non-empty string'
+        });
+      }
+
+      hospital.name = name.trim();
+    }
+
+    // Email
+    if (email !== undefined) {
+      if (
+        typeof email !== 'string' ||
+        !EMAIL_REGEX.test(email.trim())
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format'
+        });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      const existingHospital = await Hospital.findOne({
+        email: normalizedEmail,
+        _id: { $ne: hospital._id }
+      });
+
+      if (existingHospital) {
+        return res.status(409).json({
+          success: false,
+          message: 'A hospital with this email already exists'
+        });
+      }
+
+      hospital.email = normalizedEmail;
+    }
+
+    // Phone
+    if (phone !== undefined) {
+      if (
+        typeof phone !== 'string' ||
+        !phone.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number must be a non-empty string'
+        });
+      }
+
+      hospital.phone = phone.trim();
+    }
+
+    // Address
+    if (address !== undefined) {
+      if (
+        typeof address !== 'string' ||
+        !address.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Address must be a non-empty string'
+        });
+      }
+
+      hospital.address = address.trim();
+    }
+
+    // Location
+    if (location !== undefined) {
+      if (!isValidGeoJsonPoint(location)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'location must be a valid GeoJSON Point with [longitude, latitude] coordinates'
+        });
+      }
+
+      hospital.location = {
+        type: 'Point',
+        coordinates: location.coordinates
+      };
+    }
+
+    await hospital.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Hospital profile updated successfully',
+      data: hospital.toJSON()
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Change Hospital Password
+ * PATCH /api/hospital/password
+ */
+export const changeHospitalPassword = async (req, res, next) => {
+  try {
+    const hospital = await Hospital.findById(req.user._id);
+
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hospital profile not found'
+      });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
+    }
+
+    if (
+      typeof newPassword !== 'string' ||
+      newPassword.length < 6
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      });
+    }
+
+    const isPasswordValid = await comparePassword(
+      currentPassword,
+      hospital.password
+    );
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    hospital.password = await hashPassword(newPassword);
+
+    await hospital.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};

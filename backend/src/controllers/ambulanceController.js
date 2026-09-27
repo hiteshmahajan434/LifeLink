@@ -186,3 +186,176 @@ export const getAmbulanceProfile = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Update Authenticated Ambulance Profile
+ * PATCH /api/ambulance/profile
+ */
+export const updateAmbulanceProfile = async (req, res, next) => {
+  try {
+    const ambulance = await Ambulance.findById(req.user._id);
+
+    if (!ambulance) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ambulance profile not found'
+      });
+    }
+
+    const { name, email, mobile, hospitalName } = req.body;
+
+    // At least one field must be provided
+    if (
+      name === undefined &&
+      email === undefined &&
+      mobile === undefined &&
+      hospitalName === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one profile field is required'
+      });
+    }
+
+    // Validate and update name
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name must be a non-empty string'
+        });
+      }
+
+      ambulance.name = name.trim();
+    }
+
+    // Validate and update email
+    if (email !== undefined) {
+      if (
+        typeof email !== 'string' ||
+        !EMAIL_REGEX.test(email.trim())
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format'
+        });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check whether another ambulance already uses this email
+      const existingAmbulance = await Ambulance.findOne({
+        email: normalizedEmail,
+        _id: { $ne: ambulance._id }
+      });
+
+      if (existingAmbulance) {
+        return res.status(409).json({
+          success: false,
+          message: 'An ambulance with this email already exists'
+        });
+      }
+
+      ambulance.email = normalizedEmail;
+    }
+
+    // Validate and update mobile
+    if (mobile !== undefined) {
+      if (
+        typeof mobile !== 'string' ||
+        !mobile.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mobile number must be a non-empty string'
+        });
+      }
+
+      ambulance.mobile = mobile.trim();
+    }
+
+    // Validate and update hospital name
+    if (hospitalName !== undefined) {
+      if (
+        typeof hospitalName !== 'string' ||
+        !hospitalName.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Hospital name must be a non-empty string'
+        });
+      }
+
+      ambulance.hospitalName = hospitalName.trim();
+    }
+
+    await ambulance.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: ambulance.toJSON()
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Change Ambulance Password
+ * PATCH /api/ambulance/change-password
+ */
+export const changeAmbulancePassword = async (req, res, next) => {
+  try {
+    const ambulance = await Ambulance.findById(req.user._id);
+
+    if (!ambulance) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ambulance profile not found'
+      });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
+    }
+
+    if (
+      typeof newPassword !== 'string' ||
+      newPassword.length < 6
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      });
+    }
+
+    const isPasswordValid = await comparePassword(
+      currentPassword,
+      ambulance.password
+    );
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    ambulance.password = await hashPassword(newPassword);
+
+    await ambulance.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
