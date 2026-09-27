@@ -14,6 +14,6 @@ router.post('/register', registerAmbulance);
 router.post('/login', loginAmbulance);
 router.get('/me', authenticate, requireRole('AMBULANCE'), getAmbulanceProfile);
 router.patch('/profile', authenticate, requireRole('AMBULANCE'), updateAmbulanceProfile);
-router.get('/change-password', authenticate, requireRole('AMBULANCE'), changeAmbulancePassword);
+router.patch('/change-password', authenticate, requireRole('AMBULANCE'), changeAmbulancePassword);
 
 export default router;

@@ -15,6 +15,6 @@ router.post('/register', registerHospital);
 router.post('/login', loginHospital);
 router.get('/me', authenticate, requireRole('HOSPITAL'), getHospitalProfile);
 router.patch('/profile', authenticate, requireRole('HOSPITAL'), updateHospitalProfile);
-router.get('/change-password', authenticate, requireRole('HOSPITAL'), changeHospitalPassword);
+router.patch('/change-password', authenticate, requireRole('HOSPITAL'), changeHospitalPassword);
 
 export default router;
