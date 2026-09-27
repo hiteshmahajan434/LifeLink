@@ -451,3 +451,47 @@ export const changeHospitalPassword = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getNearbyHospitals = async (req, res, next) => {
+  try {
+    const { latitude, longitude, radius = 10000 } = req.query;
+
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const maxDistance = Number(radius);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid latitude and longitude are required",
+      });
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid latitude or longitude",
+      });
+    }
+
+    const hospitals = await Hospital.find({
+      location: {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [lng, lat],
+          },
+          $maxDistance: maxDistance,
+        },
+      },
+    }).select("-password");
+
+    return res.status(200).json({
+      success: true,
+      count: hospitals.length,
+      data: hospitals,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

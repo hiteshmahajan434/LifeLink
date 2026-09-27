@@ -4,7 +4,8 @@ import {
   loginAmbulance,
   getAmbulanceProfile,
   updateAmbulanceProfile,
-  changeAmbulancePassword
+  changeAmbulancePassword,
+  updateAmbulanceLocation
 } from '../controllers/ambulanceController.js';
 import { authenticate, requireRole } from '../middleware/authMiddleware.js';
 
@@ -15,5 +16,6 @@ router.post('/login', loginAmbulance);
 router.get('/me', authenticate, requireRole('AMBULANCE'), getAmbulanceProfile);
 router.patch('/profile', authenticate, requireRole('AMBULANCE'), updateAmbulanceProfile);
 router.patch('/change-password', authenticate, requireRole('AMBULANCE'), changeAmbulancePassword);
+router.patch('/location', authenticate, requireRole('AMBULANCE'), updateAmbulanceLocation);
 
 export default router;

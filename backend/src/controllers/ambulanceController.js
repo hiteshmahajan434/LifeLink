@@ -359,3 +359,57 @@ export const changeAmbulancePassword = async (req, res, next) => {
     next(error);
   }
 };
+
+export const updateAmbulanceLocation = async (req, res, next) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Latitude and longitude must be numbers",
+      });
+    }
+
+    if (
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid latitude or longitude",
+      });
+    }
+
+    const ambulance = await Ambulance.findById(req.user._id);
+
+    if (!ambulance) {
+      return res.status(404).json({
+        success: false,
+        message: "Ambulance profile not found",
+      });
+    }
+
+    ambulance.currentLocation = {
+      type: "Point",
+      coordinates: [longitude, latitude],
+    };
+
+    await ambulance.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Location updated successfully",
+      data: {
+        currentLocation: ambulance.currentLocation,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
