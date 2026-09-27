@@ -37,6 +37,11 @@ const hospitalEmergencyRequestSchema = new mongoose.Schema(
       default: Date.now
     },
 
+    expiresAt: {
+      type: Date,
+      required: true
+    },
+
     respondedAt: {
       type: Date,
       default: null
@@ -56,6 +61,11 @@ hospitalEmergencyRequestSchema.index({
 // Quickly find all hospital requests belonging to an emergency
 hospitalEmergencyRequestSchema.index({
   emergencyId: 1
+});
+
+hospitalEmergencyRequestSchema.index({
+  status: 1,
+  expiresAt: 1
 });
 
 const HospitalEmergencyRequest = mongoose.model(

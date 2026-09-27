@@ -1,7 +1,9 @@
 import { Router } from 'express';
 
 import {
-  getHospitalRequests
+  getHospitalRequests,
+  acceptHospitalRequest,
+  rejectHospitalRequest
 } from '../controllers/hospitalRequestController.js';
 
 import {
@@ -16,6 +18,20 @@ router.get(
   authenticate,
   requireRole('HOSPITAL'),
   getHospitalRequests
+);
+
+router.post(
+  '/:requestId/accept',
+  authenticate,
+  requireRole('HOSPITAL'),
+  acceptHospitalRequest
+);
+
+router.post(
+  '/:requestId/reject',
+  authenticate,
+  requireRole('HOSPITAL'),
+  rejectHospitalRequest
 );
 
 export default router;
