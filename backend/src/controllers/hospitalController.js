@@ -3,6 +3,7 @@ import { generateHospitalId } from '../utils/counterService.js';
 import { hashPassword, comparePassword } from '../utils/passwordService.js';
 import { signToken } from '../utils/jwtService.js';
 import HospitalResource from '../models/HospitalResource.js';
+import HospitalEmergencyRequest from '../models/HospitalEmergencyRequest.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -491,6 +492,124 @@ export const getNearbyHospitals = async (req, res, next) => {
       count: hospitals.length,
       data: hospitals,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get Hospital Dashboard
+ * GET /api/hospital/dashboard
+ */
+export const getHospitalDashboard = async (req, res, next) => {
+  try {
+    const hospitalId = req.user?._id;
+
+    if (!hospitalId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticated hospital ID is missing'
+      });
+    }
+
+    // Get hospital and its resources
+    const hospital = await Hospital.findById(hospitalId)
+      .select('id name resourceId');
+
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hospital not found'
+      });
+    }
+
+    const resources = await HospitalResource.findOne({
+      hospitalId
+    });
+
+    if (!resources) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hospital resources not found'
+      });
+    }
+
+    // Helper for resource calculations
+    const formatResource = (resource) => ({
+      total: resource.total,
+      occupied: resource.occupied,
+      reserved: resource.reserved,
+      available: Math.max(
+        0,
+        resource.total - resource.occupied - resource.reserved
+      )
+    });
+
+    // Get request statistics
+    const [
+      pendingRequests,
+      acceptedRequests,
+      activeRequests
+    ] = await Promise.all([
+      HospitalEmergencyRequest.countDocuments({
+        hospitalId,
+        status: 'PENDING'
+      }),
+
+      HospitalEmergencyRequest.countDocuments({
+        hospitalId,
+        status: 'ACCEPTED'
+      }),
+
+      HospitalEmergencyRequest.countDocuments({
+        hospitalId,
+        status: {
+          $in: ['PENDING', 'ACCEPTED']
+        }
+      })
+    ]);
+
+    // Get recent requests
+    const recentRequests = await HospitalEmergencyRequest.find({
+      hospitalId
+    })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate({
+        path: 'emergencyId',
+        select: 'id status aiParsedRequirements createdAt'
+      });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Hospital dashboard retrieved successfully',
+
+      data: {
+        hospital: {
+          id: hospital.id,
+          name: hospital.name
+        },
+
+        resources: {
+          icuBeds: formatResource(resources.icuBeds),
+          traumaBeds: formatResource(resources.traumaBeds),
+          generalBeds: formatResource(resources.generalBeds),
+          ventilators: formatResource(resources.ventilators),
+
+          oxygenSupply: resources.oxygenSupply,
+          bloodBank: resources.bloodBank
+        },
+
+        statistics: {
+          pendingRequests,
+          acceptedRequests,
+          activeRequests
+        },
+
+        recentRequests
+      }
+    });
+
   } catch (error) {
     next(error);
   }

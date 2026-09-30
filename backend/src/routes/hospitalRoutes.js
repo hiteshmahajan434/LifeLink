@@ -5,7 +5,8 @@ import {
   getHospitalProfile,
   changeHospitalPassword,
   updateHospitalProfile,
-  getNearbyHospitals
+  getNearbyHospitals,
+  getHospitalDashboard
 } from '../controllers/hospitalController.js';
 import { authenticate, requireRole } from '../middleware/authMiddleware.js';
 
@@ -17,5 +18,6 @@ router.get('/me', authenticate, requireRole('HOSPITAL'), getHospitalProfile);
 router.patch('/profile', authenticate, requireRole('HOSPITAL'), updateHospitalProfile);
 router.patch('/change-password', authenticate, requireRole('HOSPITAL'), changeHospitalPassword);
 router.get("/nearby", authenticate, requireRole('AMBULANCE'), getNearbyHospitals);
+router.get("/dashboard", authenticate, requireRole('HOSPITAL'), getHospitalDashboard);
 
 export default router;

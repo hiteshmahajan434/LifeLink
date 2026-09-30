@@ -216,9 +216,9 @@ const emergencyRequestSchema = new mongoose.Schema(
     },
 
     ambulanceId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ambulance",
       required: true,
-      trim: true
     },
 
     location: {

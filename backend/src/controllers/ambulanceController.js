@@ -1,4 +1,5 @@
 import Ambulance from '../models/Ambulance.js';
+import EmergencyRequest from '../models/EmergencyRequest.js';
 import { generateAmbulanceId } from '../utils/counterService.js';
 import { hashPassword, comparePassword } from '../utils/passwordService.js';
 import { signToken } from '../utils/jwtService.js';
@@ -408,6 +409,49 @@ export const updateAmbulanceLocation = async (req, res, next) => {
       data: {
         currentLocation: ambulance.currentLocation,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get Ambulance Emergency Requests
+ *
+ * GET /api/ambulance/emergency
+ */
+export const getAmbulanceEmergencyRequests = async (req, res, next) => {
+  try {
+    // ----------------------------------
+    // 1. Get authenticated ambulance ID
+    // ----------------------------------
+
+    const ambulanceId = req.user?._id.toString();
+
+    if (!ambulanceId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authenticated ambulance ID is missing",
+      });
+    }
+
+    // ----------------------------------
+    // 2. Find requests belonging
+    //    to this ambulance
+    // ----------------------------------
+
+    const emergencyRequests = await EmergencyRequest.find({
+      ambulanceId,
+    }).sort({ createdAt: -1 });
+
+    // ----------------------------------
+    // 3. Return requests
+    // ----------------------------------
+
+    return res.status(200).json({
+      success: true,
+      message: "Emergency requests fetched successfully",
+      data: emergencyRequests,
     });
   } catch (error) {
     next(error);
