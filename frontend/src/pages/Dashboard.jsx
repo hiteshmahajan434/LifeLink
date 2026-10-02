@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useCurrentLocation } from "../hooks/useCurrentLocation";
-import { updateAmbulanceLocation } from "../api/auth.api";
+import { updateAmbulanceLocation } from "../api/ambulance.api";
 import { useNearbyHospitals } from "../hooks/useNearbyHospitals";
 import EmergencyMap from "../components/map/EmergencyMap";
 import EmergencyCard from "../components/emergency/EmergencyCard";
