@@ -1,11 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import Login from "../pages/Login";
-import Dashboard from "../pages/Dashboard";
-import HospitalLogin from "../pages/HospitalLogin";
-
 import LandingPage from "../pages/LandingPage/LandingPage";
-import Register from "../pages/Register";
 
 // Shared shell (sidebar + header + workspace) — one layout for both roles
 import AppLayout from "../components/layout/AppLayout";
@@ -24,35 +19,6 @@ const AppRoutes = () => {
     <Routes>
       {/* Landing */}
       <Route path="/" element={<LandingPage />} />
-
-      {/* Ambulance Auth */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-
-      {/* Existing Dashboard */}
-      <Route path="/dashboard" element={<Dashboard />} />
-
-      {/* Hospital Auth */}
-      <Route path="/hospital/login" element={<HospitalLogin />} />
-
-      {/* Temporary Registration */}
-      <Route
-        path="/ambulance/register"
-        element={
-          <div>
-            Ambulance Registration - Coming Next
-          </div>
-        }
-      />
-
-      <Route
-        path="/hospital/register"
-        element={
-          <div>
-            Hospital Registration - Coming Next
-          </div>
-        }
-      />
 
       {/* Ambulance portal */}
       <Route path="/ambulance" element={<AppLayout role="AMBULANCE" />}>
