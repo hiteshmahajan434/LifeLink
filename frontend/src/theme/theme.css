@@ -1,0 +1,152 @@
+/* ==========================================================================
+   LIFELINK THEME  —  the ONE place colors, type and radii are defined.
+
+   Layer 1  PALETTE   exact hex values from the Figma color sheet.
+   Layer 2  ROLES     what each color is *for* (sidebar, card, primary …).
+   Components only ever use ROLE names (bg-sidebar, text-ink, bg-primary …),
+   so re-theming = editing this file. No hex codes anywhere else.
+   ========================================================================== */
+
+/* ------------------------------ LAYER 1: PALETTE ------------------------------ */
+:root {
+  /* white / neutral */
+  --p-white: #FFFFFF;
+  --p-neutral-200: #D6D6D6;
+  --p-neutral-300: #AFAFAF;
+  --p-neutral-400: #898989;
+  --p-neutral-500: #656565;
+  --p-neutral-600: #434343;
+  --p-neutral-700: #242424;
+
+  /* lime — brand / primary action */
+  --p-lime-100: #DAF163;
+  --p-lime-200: #B4C750;
+  --p-lime-300: #8F9F3F;
+  --p-lime-400: #6C792E;
+  --p-lime-500: #4B541E;
+  --p-lime-600: #2D330F;
+  --p-lime-700: #101303;
+
+  /* grey */
+  --p-grey-100: #E1E1E1;
+  --p-grey-200: #B9B9B9;
+  --p-grey-300: #939393;
+  --p-grey-400: #6F6F6F;
+  --p-grey-500: #4C4C4C;
+  --p-grey-600: #2C2C2C;
+  --p-grey-700: #111111;
+
+  /* lavender — secondary / AI */
+  --p-lavender-100: #E2DFFB;
+  --p-lavender-200: #BBB2F5;
+  --p-lavender-300: #9685EF;
+  --p-lavender-400: #7255E7;
+  --p-lavender-500: #5129C5;
+  --p-lavender-600: #2F167A;
+  --p-lavender-700: #12063A;
+
+  /* paper */
+  --p-paper-100: #FBFBFB;
+  --p-paper-200: #D2D2D2;
+  --p-paper-300: #ABABAB;
+  --p-paper-400: #868686;
+  --p-paper-500: #626262;
+  --p-paper-600: #404040;
+  --p-paper-700: #212121;
+
+  /* ink — sidebar / frame / text */
+  --p-ink-100: #F1F0F1;
+  --p-ink-200: #D3D2D4;
+  --p-ink-300: #ACABAF;
+  --p-ink-400: #87858B;
+  --p-ink-500: #636168;
+  --p-ink-600: #414045;
+  --p-ink-700: #222124;
+
+  /* The palette sheet has no red. Emergency-critical states need one, so this
+     is the ONLY color outside the Figma sheet. Change it here if you get a red. */
+  --p-alert: #D64545;
+}
+
+/* ------------------------------ LAYER 2: ROLES ------------------------------ */
+@theme inline {
+  /* Remove Tailwind's default palette so only the colors below exist */
+  --color-*: initial;
+  --color-white: var(--p-white);
+
+  /* Frame + sidebar (the dark shell around the workspace) */
+  --color-frame: var(--p-ink-700);
+  --color-sidebar: var(--p-ink-700);
+  --color-sidebar-hover: var(--p-ink-600);
+  --color-sidebar-text: var(--p-ink-300);
+
+  /* Workspace + cards */
+  --color-workspace: var(--p-ink-100);        /* light gray canvas */
+  --color-card: var(--p-white);
+  --color-card-muted: var(--p-paper-100);     /* inputs, nested blocks */
+  --color-card-dark: var(--p-ink-700);        /* dark analytics blocks */
+  --color-line: var(--p-grey-100);            /* hairline borders */
+  --color-line-strong: var(--p-ink-200);
+
+  /* Text */
+  --color-ink: var(--p-ink-700);
+  --color-ink-soft: var(--p-ink-500);         /* secondary text */
+  --color-ink-muted: var(--p-ink-400);        /* captions, placeholders */
+  --color-on-dark: var(--p-white);
+  --color-on-dark-muted: var(--p-ink-300);
+
+  /* Primary = lime (main actions, active states) */
+  --color-primary: var(--p-lime-100);
+  --color-primary-hover: var(--p-lime-200);
+  --color-primary-strong: var(--p-lime-500);  /* text on primary-soft */
+  --color-primary-soft: color-mix(in srgb, var(--p-lime-100) 35%, var(--p-white));
+  --color-on-primary: var(--p-ink-700);
+
+  /* Accent = lavender (AI + secondary info) */
+  --color-accent: var(--p-lavender-200);
+  --color-accent-hover: var(--p-lavender-300);
+  --color-accent-soft: var(--p-lavender-100);
+  --color-accent-strong: var(--p-lavender-500);
+
+  /* Critical = red, emergencies & errors only */
+  --color-critical: var(--p-alert);
+  --color-critical-soft: color-mix(in srgb, var(--p-alert) 10%, var(--p-white));
+
+  /* Legacy names still referenced by pages/Register.jsx — aliases of the roles above.
+     Prefer the role names in new code. */
+  --color-lifelink-text: var(--p-ink-700);
+  --color-lifelink-secondary: var(--p-ink-500);
+  --color-lifelink-muted: var(--p-ink-400);
+  --color-lifelink-dark: var(--p-ink-700);
+  --color-lifelink-bg: var(--p-ink-100);
+  --color-lifelink-border: var(--p-grey-100);
+  --color-lifelink-lime: var(--p-lime-100);
+  --color-lifelink-lime-soft: color-mix(in srgb, var(--p-lime-100) 35%, var(--p-white));
+  --color-lifelink-lavender: var(--p-lavender-200);
+  --color-lifelink-lavender-soft: var(--p-lavender-100);
+  --color-lifelink-danger: var(--p-alert);
+  --color-lifelink-success: var(--p-lime-500);
+}
+
+/* ------------------------------ TYPE, RADII, SHADOWS ------------------------------ */
+@theme {
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+
+  /* Stitch type scale */
+  --text-display: 36px;   --text-display--line-height: 44px;
+  --text-headline: 28px;  --text-headline--line-height: 36px;
+  --text-title: 20px;     --text-title--line-height: 26px;
+  --text-subtitle: 16px;  --text-subtitle--line-height: 22px;
+  --text-body: 13px;      --text-body--line-height: 18px;
+  --text-caption: 12px;   --text-caption--line-height: 16px;
+  --text-label: 11px;     --text-label--line-height: 14px;
+
+  /* Stitch shapes */
+  --radius-field: 0.75rem;   /* inputs, small buttons */
+  --radius-card: 1.25rem;    /* cards */
+  --radius-panel: 1.5rem;    /* workspace + big panels */
+
+  --shadow-card: 0 4px 16px -2px rgb(17 24 39 / 0.04), 0 1px 3px rgb(17 24 39 / 0.02);
+  --shadow-float: 0 12px 24px -4px rgb(17 24 39 / 0.08), 0 4px 8px -2px rgb(17 24 39 / 0.03);
+  --shadow-modal: 0 24px 48px -12px rgb(15 23 42 / 0.2);
+}
