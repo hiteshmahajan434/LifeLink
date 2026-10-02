@@ -1,57 +1,80 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
-import EmergencyRequest from "../pages/EmergencyRequest";
+import HospitalLogin from "../pages/HospitalLogin";
 
-const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem("token");
+import LandingPage from "../pages/LandingPage/LandingPage";
+import Register from "../pages/Register";
 
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+// Shared shell (sidebar + header + workspace) — one layout for both roles
+import AppLayout from "../components/layout/AppLayout";
 
-  return children;
-};
+import AmbulanceHome from "../pages/ambulance/AmbulanceHome";
+import AmbulanceRequests from "../pages/ambulance/AmbulanceRequests";
+import AmbulanceProfile from "../pages/ambulance/AmbulanceProfile";
+
+import HospitalDashboard from "../pages/hospital/HospitalDashboard";
+import HospitalRequests from "../pages/hospital/HospitalRequests";
+import HospitalInventory from "../pages/hospital/HospitalInventory";
+import HospitalProfile from "../pages/hospital/HospitalProfile";
 
 const AppRoutes = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/login"
-          element={<Login />}
-        />
+    <Routes>
+      {/* Landing */}
+      <Route path="/" element={<LandingPage />} />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+      {/* Ambulance Auth */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-        <Route
-          path="*"
-          element={<Navigate to="/login" replace />}
-        />
+      {/* Existing Dashboard */}
+      <Route path="/dashboard" element={<Dashboard />} />
 
-        {/* <Route
-        path="/emergency"
+      {/* Hospital Auth */}
+      <Route path="/hospital/login" element={<HospitalLogin />} />
+
+      {/* Temporary Registration */}
+      <Route
+        path="/ambulance/register"
         element={
-            <ProtectedRoute>
-            <EmergencyRequest />
-            </ProtectedRoute>
+          <div>
+            Ambulance Registration - Coming Next
+          </div>
         }
-        /> */}
-      </Routes>
-    </BrowserRouter>
+      />
+
+      <Route
+        path="/hospital/register"
+        element={
+          <div>
+            Hospital Registration - Coming Next
+          </div>
+        }
+      />
+
+      {/* Ambulance portal */}
+      <Route path="/ambulance" element={<AppLayout role="AMBULANCE" />}>
+        <Route index element={<AmbulanceHome />} />
+        <Route path="requests" element={<AmbulanceRequests />} />
+        <Route path="profile" element={<AmbulanceProfile />} />
+      </Route>
+
+      {/* Hospital portal */}
+      <Route path="/hospital" element={<AppLayout role="HOSPITAL" />}>
+        <Route index element={<HospitalDashboard />} />
+        <Route path="requests" element={<HospitalRequests />} />
+        <Route path="inventory" element={<HospitalInventory />} />
+        <Route path="profile" element={<HospitalProfile />} />
+      </Route>
+
+      {/* Unknown route */}
+      <Route
+        path="*"
+        element={<Navigate to="/" replace />}
+      />
+    </Routes>
   );
 };
 
