@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const Login = () => {
+const HospitalLogin = () => {
   const navigate = useNavigate();
-  const { loginAsAmbulance  } = useAuth();
+  const { loginAsHospital } = useAuth();
 
   const [formData, setFormData] = useState({
     identifier: "",
@@ -30,17 +30,18 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await loginAsAmbulance (formData);
+      const response = await loginAsHospital(formData);
 
-      navigate("/dashboard");
+      if (response.success) {
+        navigate("/hospital/dashboard");
+      }
     } catch (error) {
-      console.error("Login failed:", error);
+      console.error("Hospital login failed:", error);
 
-      const message =
+      setError(
         error.response?.data?.message ||
-        "Login failed. Please check your credentials.";
-
-      setError(message);
+          "Login failed. Please check your credentials."
+      );
     } finally {
       setLoading(false);
     }
@@ -49,12 +50,12 @@ const Login = () => {
   return (
     <div>
       <h1>LifeLink</h1>
-      <h2>Ambulance Login</h2>
+      <h2>Hospital Login</h2>
 
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="identifier">
-            Ambulance ID / Email
+            Hospital ID / Email
           </label>
 
           <input
@@ -63,7 +64,7 @@ const Login = () => {
             type="text"
             value={formData.identifier}
             onChange={handleChange}
-            placeholder="AMB-100 or email"
+            placeholder="HOSP-100 or hospital@email.com"
             required
           />
         </div>
@@ -90,8 +91,15 @@ const Login = () => {
           {loading ? "Logging in..." : "Login"}
         </button>
       </form>
+
+      <button
+        type="button"
+        onClick={() => navigate("/")}
+      >
+        Back
+      </button>
     </div>
   );
 };
 
-export default Login;
+export default HospitalLogin;

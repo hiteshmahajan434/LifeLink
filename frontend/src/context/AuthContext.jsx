@@ -1,39 +1,95 @@
-import { createContext, useContext, useEffect, useState } from "react";
 import {
-  loginAmbulance,
-  registerAmbulance,
-  getAmbulanceProfile,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  login,
+  register,
 } from "../api/auth.api";
+
+import {
+  getAmbulanceProfile,
+} from "../api/ambulance.api";
+
+import {
+  getHospitalProfile,
+} from "../api/hospital.api";
+
+import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem("token"));
+
+  const [token, setToken] = useState(() =>
+    localStorage.getItem("token")
+  );
+
+  const [role, setRole] = useState(() =>
+    localStorage.getItem("role")
+  );
+
   const [loading, setLoading] = useState(true);
 
-  // Restore logged-in user when the app starts
+  const navigate = useNavigate();
+
+
+  // =====================================================
+  // RESTORE SESSION
+  // =====================================================
+
   useEffect(() => {
     const restoreSession = async () => {
-      const storedToken = localStorage.getItem("token");
+      const storedToken =
+        localStorage.getItem("token");
 
-      if (!storedToken) {
+      const storedRole =
+        localStorage.getItem("role");
+
+      if (!storedToken || !storedRole) {
         setLoading(false);
         return;
       }
 
       try {
-        const response = await getAmbulanceProfile();
+        let response;
+
+        if (storedRole === "AMBULANCE") {
+          response =
+            await getAmbulanceProfile();
+        } else if (storedRole === "HOSPITAL") {
+          response =
+            await getHospitalProfile();
+        } else {
+          throw new Error(
+            "Unknown user role"
+          );
+        }
 
         if (response.success) {
           setUser(response.data);
           setToken(storedToken);
+          setRole(storedRole);
+        } else {
+          throw new Error(
+            "Session is no longer valid"
+          );
         }
       } catch (error) {
-        console.error("Session restore failed:", error);
+        console.error(
+          "Session restore failed:",
+          error
+        );
 
         localStorage.removeItem("token");
+        localStorage.removeItem("role");
+
         setToken(null);
+        setRole(null);
         setUser(null);
       } finally {
         setLoading(false);
@@ -43,51 +99,120 @@ export const AuthProvider = ({ children }) => {
     restoreSession();
   }, []);
 
-  // Login
-  const login = async (credentials) => {
-    const response = await loginAmbulance(credentials);
+  // =====================================================
+  // LOGIN
+  // =====================================================
+
+  const loginAs = async (
+    selectedRole,
+    credentials
+  ) => {
+    const response = await login(
+      selectedRole,
+      credentials
+    );
 
     if (response.success) {
-      localStorage.setItem("token", response.token);
+      const normalizedRole =
+        selectedRole === "ambulance"
+          ? "AMBULANCE"
+          : "HOSPITAL";
+
+      localStorage.setItem(
+        "token",
+        response.token
+      );
+
+      localStorage.setItem(
+        "role",
+        normalizedRole
+      );
 
       setToken(response.token);
+      setRole(normalizedRole);
       setUser(response.data);
     }
 
     return response;
   };
 
-  // Register
-  const register = async (ambulanceData) => {
-    const response = await registerAmbulance(ambulanceData);
+  // =====================================================
+  // REGISTER
+  // =====================================================
+
+  const registerAs = async (
+    selectedRole,
+    data
+  ) => {
+    const response = await register(
+      selectedRole,
+      data
+    );
 
     if (response.success) {
-      localStorage.setItem("token", response.token);
+      const normalizedRole =
+        selectedRole === "ambulance"
+          ? "AMBULANCE"
+          : "HOSPITAL";
+
+      localStorage.setItem(
+        "token",
+        response.token
+      );
+
+      localStorage.setItem(
+        "role",
+        normalizedRole
+      );
 
       setToken(response.token);
+      setRole(normalizedRole);
       setUser(response.data);
     }
 
     return response;
   };
 
-  // Logout
+  // =====================================================
+  // LOGOUT
+  // =====================================================
+
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
 
     setToken(null);
+    setRole(null);
     setUser(null);
+    
+    navigate("/");
   };
+
+  // =====================================================
+  // UPDATE USER (e.g. after the profile page saves changes)
+  // =====================================================
+
+  const updateUser = (data) =>
+    setUser((previous) => ({ ...previous, ...data }));
+
+  // =====================================================
+  // CONTEXT VALUE
+  // =====================================================
 
   const value = {
     user,
     token,
+    role,
     loading,
-    isAuthenticated: !!token && !!user,
 
-    login,
-    register,
+    isAuthenticated:
+      !!token && !!user,
+
+    loginAs,
+    registerAs,
+
     logout,
+    updateUser,
   };
 
   return (
@@ -97,11 +222,18 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// =====================================================
+// HOOK
+// =====================================================
+
 export const useAuth = () => {
-  const context = useContext(AuthContext);
+  const context =
+    useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
+    throw new Error(
+      "useAuth must be used inside AuthProvider"
+    );
   }
 
   return context;
