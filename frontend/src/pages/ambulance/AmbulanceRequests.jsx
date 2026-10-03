@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { ClipboardList, Eye, HeartPulse, Hospital, RefreshCw, Zap, CircleCheck } from "lucide-react";
+import { ClipboardList, Eye, HeartPulse, Hospital, RefreshCw, Zap, CircleCheck, CircleAlert } from "lucide-react";
+
 import { getEmergencyRequests } from "../../api/ambulance.api";
+
 import useFetch from "../../hooks/useFetch";
+
 import PageHero from "../../components/layout/PageHero";
 import RequirementsSummary from "../../components/emergency/RequirementsSummary";
 import {
   Button, Card, CardHeader, ChipGroup, EmptyState, ErrorState, LoadingState, Modal, Pagination, StatCard, StatusBadge,
 } from "../../components/ui";
+
 import { CRITICAL_EMERGENCY_TYPES } from "../../config/resources";
 import { formatDate, formatDateTime, formatLabel } from "../../utils/format";
 import { getRequirements } from "../../utils/status";
@@ -26,6 +30,7 @@ const AmbulanceRequests = () => {
   const requests = Array.isArray(data) ? data : [];
   const active = requests.filter((r) => ACTIVE.includes(r.status));
   const completed = requests.filter((r) => r.status === "COMPLETED");
+  const cancelled = requests.filter((r) => r.status === "CANCELLED");
   const filtered = filter === "active" ? active : filter === "completed" ? completed : requests;
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -40,8 +45,8 @@ const AmbulanceRequests = () => {
       <div className="space-y-6 px-6 pb-8 lg:px-8">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard title="Total dispatches" value={requests.length} note="All time" icon={Zap} />
-          <StatCard title="Active" value={active.length} unit="requests" note="Currently in progress" icon={HeartPulse} tone="accent" />
-          <StatCard title="Hospital assigned" value={requests.filter((r) => r.assignedHospital).length} note="Matched to a hospital" icon={Hospital} />
+          <StatCard title="Active" value={active.length} note="Currently in progress" icon={HeartPulse} tone="accent" />
+          <StatCard title="Cancelled" value={cancelled.length} note="Cancelled ones" icon={CircleAlert} />
           <StatCard title="Completed" value={completed.length} note="Closed cases" icon={CircleCheck} tone="accent" />
         </div>
 

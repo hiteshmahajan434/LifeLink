@@ -8,8 +8,6 @@ import LiveMap from "./LiveMap";
 import { Badge } from "../ui";
 
 import {
-  distanceKm,
-  etaMinutes,
   toLatLng,
 } from "../../utils/geo";
 
@@ -30,35 +28,12 @@ export default function MapCard({
    */
   const resolvedRouteHospital = routeHospital
     ? hospitals.find(
-        (hospital) =>
-          String(hospital._id) ===
-            String(routeHospital._id) ||
-          String(hospital.id) ===
-            String(routeHospital.id)
-      ) || routeHospital
-    : null;
-
-  /*
-   * Find the nearest hospital when there
-   * is no assigned hospital yet.
-   */
-  const nearest = location
-    ? [...hospitals]
-        .map((hospital) => ({
-          hospital,
-          point: toLatLng(hospital),
-        }))
-        .filter((item) => item.point)
-        .map((item) => ({
-          ...item,
-          km: distanceKm(
-            location.latitude,
-            location.longitude,
-            item.point.latitude,
-            item.point.longitude
-          ),
-        }))
-        .sort((a, b) => a.km - b.km)[0]
+      (hospital) =>
+        String(hospital._id) ===
+        String(routeHospital._id) ||
+        String(hospital.id) ===
+        String(routeHospital.id)
+    ) || routeHospital
     : null;
 
   /*
@@ -69,19 +44,6 @@ export default function MapCard({
     resolvedRouteHospital && location
       ? toLatLng(resolvedRouteHospital)
       : null;
-
-  const focus = assignedPoint
-    ? {
-        hospital: resolvedRouteHospital,
-        point: assignedPoint,
-        km: distanceKm(
-          location.latitude,
-          location.longitude,
-          assignedPoint.latitude,
-          assignedPoint.longitude
-        ),
-      }
-    : nearest;
 
   /*
    * Calculate the actual road route.
@@ -95,27 +57,6 @@ export default function MapCard({
     assignedPoint
   );
 
-  /*
-   * Prefer actual road distance/ETA from
-   * the routing service.
-   *
-   * Fall back to straight-line distance
-   * before a road route is available.
-   */
-  const displayDistanceKm = route
-    ? route.distanceMeters / 1000
-    : focus?.km ?? null;
-
-  const displayEtaMinutes = route
-    ? Math.max(
-        1,
-        Math.ceil(
-          route.durationSeconds / 60
-        )
-      )
-    : focus
-      ? etaMinutes(focus.km)
-      : null;
 
   return (
     <div className="flex min-h-[520px] flex-col overflow-hidden rounded-card border border-line bg-card shadow-card">
@@ -177,55 +118,29 @@ export default function MapCard({
           </div>
         )}
 
-        {/* Route / destination information */}
-        {focus && (
-          <div className="absolute bottom-4 left-4 right-4 z-[500] flex items-center gap-3 rounded-card border border-line bg-card/95 p-3.5 shadow-float backdrop-blur sm:right-auto sm:max-w-md">
-
+        {assignedPoint && route && (
+          <div className="absolute bottom-4 left-4 z-[500] flex items-center gap-3 rounded-card border border-line bg-card/95 p-3.5 shadow-float backdrop-blur">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-field bg-primary-soft text-primary-strong">
               <Navigation size={18} />
             </span>
 
-            <div className="min-w-0">
-
-              <p className="flex items-center gap-2 text-body font-semibold text-ink">
-                <span className="truncate">
-                  {routeHospital
-                    ? "Route to "
-                    : "Nearest: "}
-                  {focus.hospital.name}
-                </span>
-
-                <Badge
-                  tone={
-                    routeHospital
-                      ? "primary"
-                      : "neutral"
-                  }
-                >
-                  {routeHospital
-                    ? "Assigned"
-                    : "Nearest"}
-                </Badge>
+            <div>
+              <p className="text-body font-semibold text-ink">
+                {resolvedRouteHospital?.name}
               </p>
 
               <p className="text-caption text-ink-muted">
-                {route ? (
-                  <>
-                    {displayDistanceKm.toFixed(
-                      1
-                    )}{" "}
-                    km · about{" "}
-                    {displayEtaMinutes} min away
-                  </>
-                ) : routeLoading ? (
-                  "Calculating road route..."
-                ) : routeError ? (
-                  "Road route unavailable"
-                ) : (
-                  "Calculating route..."
-                )}
+                {(route.distanceMeters / 1000).toFixed(1)} km
+                {" · "}
+                about{" "}
+                {Math.max(
+                  1,
+                  Math.ceil(
+                    route.durationSeconds / 60
+                  )
+                )}{" "}
+                min away
               </p>
-
             </div>
           </div>
         )}

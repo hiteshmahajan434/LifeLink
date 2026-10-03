@@ -368,7 +368,7 @@ export default function EmergencyRequestPanel({
         request._id
       );
 
-      setRequest(response.data);
+      setRequest(response.data.emergency);
       setStep("searching");
     }, "Unable to confirm emergency request.");
 
