@@ -18,6 +18,8 @@ import {
   getHospitalProfile,
 } from "../api/hospital.api";
 
+import socket from "../socket/socket";
+
 import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext(null);
@@ -74,6 +76,12 @@ export const AuthProvider = ({ children }) => {
           setUser(response.data);
           setToken(storedToken);
           setRole(storedRole);
+
+          socket.auth = {
+            token: storedToken,
+          };
+
+          socket.connect();
         } else {
           throw new Error(
             "Session is no longer valid"
@@ -131,6 +139,12 @@ export const AuthProvider = ({ children }) => {
       setToken(response.token);
       setRole(normalizedRole);
       setUser(response.data);
+
+      socket.auth = {
+        token: response.token,
+      };
+
+      socket.connect();
     }
 
     return response;
@@ -168,6 +182,12 @@ export const AuthProvider = ({ children }) => {
       setToken(response.token);
       setRole(normalizedRole);
       setUser(response.data);
+
+      socket.auth = {
+        token: response.token,
+      };
+
+      socket.connect();
     }
 
     return response;
@@ -178,6 +198,8 @@ export const AuthProvider = ({ children }) => {
   // =====================================================
 
   const logout = () => {
+    socket.disconnect();
+
     localStorage.removeItem("token");
     localStorage.removeItem("role");
 
