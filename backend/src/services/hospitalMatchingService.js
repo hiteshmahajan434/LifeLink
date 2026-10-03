@@ -3,6 +3,8 @@ import HospitalResource from '../models/HospitalResource.js';
 import HospitalEmergencyRequest from '../models/HospitalEmergencyRequest.js';
 import EmergencyRequest from '../models/EmergencyRequest.js';
 
+import { getIO } from '../socket/socket.js';
+
 const BATCH_SIZE = 2;
 
 const HOSPITAL_RESPONSE_WINDOW_MS = 60 * 1000;
@@ -270,7 +272,45 @@ export const createHospitalBatch  = async (
         })
       )
     );
+  
+  // --------------------------------------------------
+  // Notify selected hospitals
+  // --------------------------------------------------
 
+  const io = getIO();
+
+  hospitalRequests.forEach((request, index) => {
+    const hospital = selectedHospitals[index].hospital;
+
+    io.to(`hospital:${hospital.id}`).emit(
+      'emergency:new',
+      {
+        _id: request._id,
+
+        emergencyId: {
+          _id: emergency._id,
+          id: emergency.id,
+          location: emergency.location,
+          confirmedRequirements:
+            emergency.confirmedRequirements,
+          status: emergency.status,
+          createdAt: emergency.createdAt
+        },
+
+        hospitalId: hospital._id,
+
+        status: 'PENDING',
+
+        batchNumber,
+
+        sentAt,
+        expiresAt,
+
+        createdAt: request.createdAt
+      }
+    );
+  });
+  
   return {
     success: true,
 
