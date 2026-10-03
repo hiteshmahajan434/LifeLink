@@ -4,6 +4,7 @@ import HospitalEmergencyRequest from '../models/HospitalEmergencyRequest.js';
 import EmergencyRequest from '../models/EmergencyRequest.js';
 
 import { getIO } from '../socket/socket.js';
+import { getRoadDistances } from './routingService.js';
 
 const BATCH_SIZE = 2;
 
@@ -66,55 +67,13 @@ const hasRequiredResources = (
   return true;
 };
 
-// --------------------------------------------------
-// Calculate distance
-// --------------------------------------------------
 
-const calculateDistanceInKm = (
-  emergencyCoordinates,
-  hospitalCoordinates
-) => {
-  const [longitude1, latitude1] =
-    emergencyCoordinates;
-
-  const [longitude2, latitude2] =
-    hospitalCoordinates;
-
-  const earthRadiusKm = 6371;
-
-  const latitude1Rad =
-    (latitude1 * Math.PI) / 180;
-
-  const latitude2Rad =
-    (latitude2 * Math.PI) / 180;
-
-  const deltaLatitude =
-    ((latitude2 - latitude1) * Math.PI) / 180;
-
-  const deltaLongitude =
-    ((longitude2 - longitude1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(deltaLatitude / 2) ** 2 +
-    Math.cos(latitude1Rad) *
-      Math.cos(latitude2Rad) *
-      Math.sin(deltaLongitude / 2) ** 2;
-
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a)
-    );
-
-  return earthRadiusKm * c;
-};
 
 // --------------------------------------------------
 // Create next hospital batch
 // --------------------------------------------------
 
-export const createHospitalBatch  = async (
+export const createHospitalBatch = async (
   emergency,
   batchNumber
 ) => {
@@ -175,9 +134,9 @@ export const createHospitalBatch  = async (
     );
   }
 
+
   const eligibleHospitals = [];
 
-  // Find eligible hospitals
   for (const hospital of hospitals) {
     // Do not contact the same hospital again
     if (
@@ -207,23 +166,46 @@ export const createHospitalBatch  = async (
       continue;
     }
 
-    const distanceKm =
-      calculateDistanceInKm(
-        emergencyCoordinates,
-        hospital.location.coordinates
-      );
-
     eligibleHospitals.push({
-      hospital,
-      distanceKm
+      hospital
     });
   }
 
-  // Nearest hospitals first
-  eligibleHospitals.sort(
-    (a, b) =>
-      a.distanceKm - b.distanceKm
+  if (eligibleHospitals.length === 0) {
+    return {
+      success: false,
+      message:
+        'No more suitable hospitals available',
+      selectedHospitals: []
+    };
+  }
+
+  const roadDistances = await getRoadDistances({
+    origin: emergencyCoordinates,
+    destinations: eligibleHospitals.map(
+      ({ hospital }) =>
+        hospital.location.coordinates
+    )
+  });
+
+  eligibleHospitals.forEach(
+    (item, index) => {
+      item.distanceKm =
+        roadDistances[index].distanceKm;
+
+      item.durationMinutes =
+        roadDistances[index].durationMinutes;
+    }
   );
+
+  // Nearest hospitals first
+  eligibleHospitals.sort((a, b) => {
+    if (a.distanceKm !== b.distanceKm) {
+      return a.distanceKm - b.distanceKm;
+    }
+
+    return a.durationMinutes - b.durationMinutes;
+  });
 
   console.log(eligibleHospitals);
 
@@ -249,7 +231,7 @@ export const createHospitalBatch  = async (
 
   const expiresAt = new Date(
     sentAt.getTime() +
-      HOSPITAL_RESPONSE_WINDOW_MS
+    HOSPITAL_RESPONSE_WINDOW_MS
   );
 
   const hospitalRequests =
@@ -272,7 +254,7 @@ export const createHospitalBatch  = async (
         })
       )
     );
-  
+
   // --------------------------------------------------
   // Notify selected hospitals
   // --------------------------------------------------
@@ -310,7 +292,7 @@ export const createHospitalBatch  = async (
       }
     );
   });
-  
+
   return {
     success: true,
 
