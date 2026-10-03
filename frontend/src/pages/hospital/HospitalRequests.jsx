@@ -1,18 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CircleCheck, Flame, Hourglass, Inbox, RefreshCw, CircleX } from "lucide-react";
+
 import { acceptHospitalRequest, getHospitalRequests, rejectHospitalRequest } from "../../api/hospital.api";
 import { useAuth } from "../../context/AuthContext";
+
 import useFetch from "../../hooks/useFetch";
 import useNow from "../../hooks/useNow";
+
 import PageHero from "../../components/layout/PageHero";
 import RequestCard from "../../components/hospital/RequestCard";
 import RequestDetails from "../../components/hospital/RequestDetails";
 import { Alert, Button, ChipGroup, EmptyState, ErrorState, LoadingState } from "../../components/ui";
+
 import { CRITICAL_EMERGENCY_TYPES } from "../../config/resources";
+
 import { getEffectiveStatus, getRequirements } from "../../utils/status";
+import { playEmergencyAlert } from "../../utils/emergencyAlert";
 import { getErrorMessage } from "../../utils/format";
 import { toLatLng } from "../../utils/geo";
 import { cn } from "../../utils/cn";
+
+import socket from "../../socket/socket";
+
 
 const Tile = ({ icon: Icon, count, label, tone }) => (
   <div className="flex items-center gap-4 rounded-card border border-line bg-card p-4 shadow-card">
@@ -27,15 +36,63 @@ const Tile = ({ icon: Icon, count, label, tone }) => (
 /** Review incoming emergencies and accept / reject them. */
 const HospitalRequests = () => {
   const { user } = useAuth();
-  const { data, loading, error, reload } = useFetch(getHospitalRequests, { interval: 15000 });
+
+  const { data, loading, error, reload } = useFetch(
+    getHospitalRequests
+  );
+
   const now = useNow();
+
+  const [requests, setRequests] = useState([]);
+  const seenRequests = useRef(new Set());
+
+  useEffect(() => {
+    if (Array.isArray(data)) {
+      setRequests(data);
+    }
+  }, [data]);
+
+useEffect(() => {
+  const handleNewEmergency = (request) => {
+    console.log("🚨 New emergency received:", request);
+
+    // Prevent duplicate alerts for the same request
+    if (seenRequests.current.has(request._id)) {
+      console.log("⚠️ Duplicate emergency ignored:", request._id);
+      return;
+    }
+
+    seenRequests.current.add(request._id);
+
+    console.log("🔔 Playing emergency alert");
+
+    playEmergencyAlert();
+
+    setRequests((previous) => {
+      if (previous.some((item) => item._id === request._id)) {
+        return previous;
+      }
+
+      return [...previous, request].sort(
+        (a, b) =>
+          new Date(a.sentAt).getTime() -
+          new Date(b.sentAt).getTime()
+      );
+    });
+  };
+
+  socket.on("emergency:new", handleNewEmergency);
+
+  return () => {
+    socket.off("emergency:new", handleNewEmergency);
+  };
+}, []);
 
   const [filter, setFilter] = useState("ALL");
   const [selectedId, setSelectedId] = useState(null);
   const [processingId, setProcessingId] = useState(null);
   const [actionError, setActionError] = useState("");
 
-  const requests = Array.isArray(data) ? data : [];
   const withStatus = requests.map((request) => ({ request, status: getEffectiveStatus(request, now) }));
   const count = (s) => withStatus.filter((x) => x.status === s).length;
   const urgent = withStatus.filter(
