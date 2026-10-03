@@ -1,6 +1,9 @@
 import HospitalEmergencyRequest from '../models/HospitalEmergencyRequest.js';
 import EmergencyRequest from '../models/EmergencyRequest.js';
 import HospitalResource from '../models/HospitalResource.js';
+import Hospital from '../models/Hospital.js';
+
+import { getIO } from '../socket/socket.js';
 
 import {
   checkBatchAndCreateNext
@@ -122,7 +125,10 @@ export const acceptHospitalRequest =
       const emergency =
         await EmergencyRequest.findById(
           hospitalRequest.emergencyId
-        );
+        ).populate({
+          path: 'ambulanceId',
+          select: 'id'
+        });
 
       if (!emergency) {
         return res.status(404).json({
@@ -290,6 +296,36 @@ export const acceptHospitalRequest =
             status: 'CANCELLED',
             respondedAt:
               new Date()
+          }
+        }
+      );
+
+      const hospital = await Hospital.findById(hospitalId)
+        .select('id name location');
+      
+      if (!hospital) {
+        return res.status(404).json({
+          success: false,
+          message: 'Hospital not found'
+        });
+      }
+
+      const io = getIO();
+
+      io.to(`ambulance:${emergency.ambulanceId.id}`).emit(
+        'emergency:assigned',
+        {
+          emergencyId: emergency.id,
+
+          hospitalRequestId:
+            hospitalRequest._id,
+
+          hospitalRequestStatus: 'ACCEPTED',
+
+          hospital: {
+            id: hospital.id,
+            name: hospital.name,
+            location: hospital.location
           }
         }
       );
