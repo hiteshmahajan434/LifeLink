@@ -23,3 +23,35 @@ export const getCurrentLocation = () => {
     );
   });
 };
+
+export const watchCurrentLocation = (onLocation, onError) => {
+  if (!navigator.geolocation) {
+    onError?.(
+      new Error("Geolocation is not supported by this browser.")
+    );
+
+    return () => {};
+  }
+
+  const watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      onLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+    },
+    (error) => {
+      onError?.(error);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000,
+    }
+  );
+
+  // Return cleanup function
+  return () => {
+    navigator.geolocation.clearWatch(watchId);
+  };
+};

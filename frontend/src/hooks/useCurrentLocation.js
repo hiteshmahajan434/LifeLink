@@ -1,5 +1,8 @@
 import { useCallback, useState } from "react";
-import { getCurrentLocation } from "../utils/location";
+import {
+  getCurrentLocation,
+  watchCurrentLocation,
+} from "../utils/location";
 
 export const useCurrentLocation = () => {
   const [location, setLocation] = useState(null);
@@ -29,10 +32,34 @@ export const useCurrentLocation = () => {
     }
   }, []);
 
+  const startWatchingLocation = useCallback(() => {
+    setLoading(true);
+    setError("");
+
+    const stopWatching = watchCurrentLocation(
+      (currentLocation) => {
+        setLocation(currentLocation);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Location watch error:", error);
+
+        setError(
+          "Unable to access your location. Please allow location permission."
+        );
+
+        setLoading(false);
+      }
+    );
+
+    return stopWatching;
+  }, []);
+
   return {
     location,
     loading,
     error,
     fetchLocation,
+    startWatchingLocation,
   };
 };

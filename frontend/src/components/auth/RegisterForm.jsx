@@ -1,15 +1,17 @@
 import { useState } from "react";
 import {
   ArrowLeft,
+  Check,
   Eye,
   EyeOff,
   Loader2,
-  UserPlus,
   MapPin,
+  UserPlus,
 } from "lucide-react";
 
 import RoleTabs from "./RoleTabs";
 import { useAuth } from "../../context/AuthContext";
+import LocationPicker from "../map/LocationPicker";
 
 const RegisterForm = ({
   role,
@@ -36,10 +38,9 @@ const RegisterForm = ({
     bloodBank: false,
   });
 
-  const [location, setLocation] =
-    useState(null);
+  const [location, setLocation] = useState(null);
 
-  const [locationLoading, setLocationLoading] =
+  const [locationPickerOpen, setLocationPickerOpen] =
     useState(false);
 
   const [showPassword, setShowPassword] =
@@ -47,6 +48,10 @@ const RegisterForm = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // =====================================================
+  // FORM CHANGE
+  // =====================================================
 
   const handleChange = (e) => {
     const { name, value, type, checked } =
@@ -61,42 +66,28 @@ const RegisterForm = ({
     }));
   };
 
-  const getLocation = () => {
-    if (!navigator.geolocation) {
-      setError(
-        "Geolocation is not supported by your browser."
-      );
-      return;
-    }
+  // =====================================================
+  // LOCATION PICKER
+  // =====================================================
 
-    setLocationLoading(true);
+  const handleLocationConfirm = ({
+    latitude,
+    longitude,
+  }) => {
+    setLocation({
+      type: "Point",
+      coordinates: [
+        longitude,
+        latitude,
+      ],
+    });
+
     setError("");
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const {
-          latitude,
-          longitude,
-        } = position.coords;
-
-        setLocation({
-          type: "Point",
-          coordinates: [
-            longitude,
-            latitude,
-          ],
-        });
-
-        setLocationLoading(false);
-      },
-      () => {
-        setLocationLoading(false);
-        setError(
-          "Location permission is required for registration."
-        );
-      }
-    );
   };
+
+  // =====================================================
+  // SUBMIT
+  // =====================================================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -117,7 +108,7 @@ const RegisterForm = ({
 
     if (!location) {
       setError(
-        "Please allow location access before registering."
+        "Please select your location on the map."
       );
       return;
     }
@@ -127,6 +118,10 @@ const RegisterForm = ({
 
       let payload;
 
+      // =================================================
+      // AMBULANCE
+      // =================================================
+
       if (role === "ambulance") {
         payload = {
           name: formData.name.trim(),
@@ -135,16 +130,25 @@ const RegisterForm = ({
           mobile: formData.phone.trim(),
           hospitalName:
             formData.hospitalName.trim(),
+
           currentLocation: location,
         };
-      } else {
+      }
+
+      // =================================================
+      // HOSPITAL
+      // =================================================
+
+      else {
         payload = {
           name: formData.name.trim(),
           email: formData.email.trim(),
           password: formData.password,
           phone: formData.phone.trim(),
           address: formData.address.trim(),
+
           location,
+
           resources: {
             icuBeds: Number(
               formData.icuBeds
@@ -192,6 +196,10 @@ const RegisterForm = ({
 
   return (
     <div className="w-full">
+      {/* ================================================= */}
+      {/* BACK */}
+      {/* ================================================= */}
+
       <button
         type="button"
         onClick={onBack}
@@ -200,6 +208,10 @@ const RegisterForm = ({
         <ArrowLeft size={16} />
         Back
       </button>
+
+      {/* ================================================= */}
+      {/* HEADER */}
+      {/* ================================================= */}
 
       <div className="mb-6">
         <p className="mb-3 text-xs font-semibold tracking-[0.18em] text-ink-muted">
@@ -215,6 +227,10 @@ const RegisterForm = ({
         </p>
       </div>
 
+      {/* ================================================= */}
+      {/* ROLE */}
+      {/* ================================================= */}
+
       <RoleTabs
         role={role}
         setRole={setRole}
@@ -224,6 +240,10 @@ const RegisterForm = ({
         onSubmit={handleSubmit}
         className="mt-6 space-y-4"
       >
+        {/* ================================================= */}
+        {/* NAME */}
+        {/* ================================================= */}
+
         <div>
           <label className="mb-2 block text-sm font-medium text-ink-soft">
             {role === "ambulance"
@@ -245,6 +265,10 @@ const RegisterForm = ({
           />
         </div>
 
+        {/* ================================================= */}
+        {/* EMAIL */}
+        {/* ================================================= */}
+
         <div>
           <label className="mb-2 block text-sm font-medium text-ink-soft">
             Email
@@ -260,6 +284,10 @@ const RegisterForm = ({
           />
         </div>
 
+        {/* ================================================= */}
+        {/* PHONE */}
+        {/* ================================================= */}
+
         <div>
           <label className="mb-2 block text-sm font-medium text-ink-soft">
             Phone
@@ -274,6 +302,10 @@ const RegisterForm = ({
             className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm outline-none placeholder:text-ink-muted focus:border-ink"
           />
         </div>
+
+        {/* ================================================= */}
+        {/* AMBULANCE ONLY */}
+        {/* ================================================= */}
 
         {role === "ambulance" && (
           <div>
@@ -292,8 +324,14 @@ const RegisterForm = ({
           </div>
         )}
 
+        {/* ================================================= */}
+        {/* HOSPITAL ONLY */}
+        {/* ================================================= */}
+
         {role === "hospital" && (
           <>
+            {/* Address */}
+
             <div>
               <label className="mb-2 block text-sm font-medium text-ink-soft">
                 Address
@@ -308,6 +346,8 @@ const RegisterForm = ({
                 className="w-full resize-none rounded-xl border border-line bg-white px-4 py-3 text-sm outline-none placeholder:text-ink-muted focus:border-ink"
               />
             </div>
+
+            {/* Resources */}
 
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -333,6 +373,8 @@ const RegisterForm = ({
               ))}
             </div>
 
+            {/* Resources toggles */}
+
             <div className="grid grid-cols-2 gap-3">
               <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-white px-3 py-3 text-sm">
                 <input
@@ -343,6 +385,7 @@ const RegisterForm = ({
                   }
                   onChange={handleChange}
                 />
+
                 Oxygen supply
               </label>
 
@@ -355,11 +398,16 @@ const RegisterForm = ({
                   }
                   onChange={handleChange}
                 />
+
                 Blood bank
               </label>
             </div>
           </>
         )}
+
+        {/* ================================================= */}
+        {/* PASSWORD */}
+        {/* ================================================= */}
 
         <div>
           <label className="mb-2 block text-sm font-medium text-ink-soft">
@@ -398,35 +446,45 @@ const RegisterForm = ({
           </div>
         </div>
 
+        {/* ================================================= */}
+        {/* LOCATION */}
+        {/* ================================================= */}
+
         <button
           type="button"
-          onClick={getLocation}
-          disabled={locationLoading}
+          onClick={() =>
+            setLocationPickerOpen(true)
+          }
           className={`flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition ${
             location
               ? "border-primary-strong/30 bg-primary-soft text-primary-strong"
               : "border-line bg-white text-ink-soft hover:border-ink"
           }`}
         >
-          {locationLoading ? (
-            <Loader2
-              size={17}
-              className="animate-spin"
-            />
+          {location ? (
+            <Check size={17} />
           ) : (
             <MapPin size={17} />
           )}
 
           {location
-            ? "Location captured"
-            : "Allow location access"}
+            ? "Location selected"
+            : "Select location on map"}
         </button>
+
+        {/* ================================================= */}
+        {/* ERROR */}
+        {/* ================================================= */}
 
         {error && (
           <div className="rounded-xl border border-critical/30 bg-critical-soft px-4 py-3 text-sm text-critical">
             {error}
           </div>
         )}
+
+        {/* ================================================= */}
+        {/* CREATE ACCOUNT */}
+        {/* ================================================= */}
 
         <button
           type="submit"
@@ -450,6 +508,10 @@ const RegisterForm = ({
         </button>
       </form>
 
+      {/* ================================================= */}
+      {/* LOGIN */}
+      {/* ================================================= */}
+
       <p className="mt-6 text-center text-sm text-ink-muted">
         Already have an account?{" "}
         <button
@@ -460,6 +522,28 @@ const RegisterForm = ({
           Sign in
         </button>
       </p>
+
+      {/* ================================================= */}
+      {/* LOCATION PICKER */}
+      {/* ================================================= */}
+
+      <LocationPicker
+        open={locationPickerOpen}
+        onClose={() =>
+          setLocationPickerOpen(false)
+        }
+        onConfirm={handleLocationConfirm}
+        initialLocation={
+          location
+            ? {
+                latitude:
+                  location.coordinates[1],
+                longitude:
+                  location.coordinates[0],
+              }
+            : null
+        }
+      />
     </div>
   );
 };

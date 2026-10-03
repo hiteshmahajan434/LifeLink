@@ -9,7 +9,7 @@ import { cn } from "../../utils/cn";
  * A "controlled" form: the parent panel owns the values, this only renders them.
  */
 export default function CreateRequestForm({
-  values, onChange, location, loading, error, onSubmit, onReset, voice,
+  values, onChange, location, loading, error, onSubmit, onReset, voice, onOpenLocationPicker,
 }) {
   const set = (field) => (value) => onChange(field, value);
 
@@ -75,13 +75,30 @@ export default function CreateRequestForm({
       </Field>
 
       <div className="flex items-center gap-3 rounded-field border border-line bg-card-muted px-3.5 py-3">
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-card text-ink"><MapPin size={16} /></span>
-        <div>
-          <p className="text-body font-semibold text-ink">Current location</p>
+        <span className="grid h-9 w-9 place-items-center rounded-full bg-card text-ink">
+          <MapPin size={16} />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-body font-semibold text-ink">
+            Emergency Location
+          </p>
+
           <p className="font-mono text-caption text-ink-muted">
-            {location ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : "Getting location…"}
+            {location
+              ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
+              : "Select location"}
           </p>
         </div>
+
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={onOpenLocationPicker}
+        >
+          Change
+        </Button>
       </div>
 
       <Alert>{error}</Alert>
