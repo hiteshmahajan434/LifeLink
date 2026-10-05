@@ -6,6 +6,7 @@ import {
   updateEmergencyRequest,
   cancelEmergencyRequest,
   confirmEmergencyRequest,
+  getActiveEmergencyRequest
 } from "../../api/emergency.api";
 
 import { useSpeechRecognition } from "../../hooks/useSpeechRecognition";
@@ -48,14 +49,19 @@ export default function EmergencyRequestPanel({
 
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const [editRequirements, setEditRequirements] = useState(null);
+  const [editRequirements, setEditRequirements] =
+    useState(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Emergency location is independent from live ambulance location.
-  const [emergencyLocation, setEmergencyLocation] = useState(null);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  // Emergency location is independent from
+  // live ambulance location.
+  const [emergencyLocation, setEmergencyLocation] =
+    useState(null);
+
+  const [showLocationPicker, setShowLocationPicker] =
+    useState(false);
 
 
   /*
@@ -71,36 +77,127 @@ export default function EmergencyRequestPanel({
     }
   }, [location, emergencyLocation]);
 
+  useEffect(() => {
 
+    const restoreActiveEmergency =
+      async () => {
+
+        try {
+
+          const response =
+            await getActiveEmergencyRequest();
+
+          const activeEmergency =
+            response.data;
+
+
+          if (!activeEmergency) {
+            return;
+          }
+
+
+          console.log(
+            "♻️ Restored active emergency:",
+            activeEmergency
+          );
+
+
+          setRequest(
+            activeEmergency
+          );
+
+
+          // Restore the correct UI step
+          if (
+            activeEmergency.status ===
+            "PARSED"
+          ) {
+
+            setStep("review");
+
+          } else if (
+            [
+              "SEARCHING_HOSPITAL",
+              "HOSPITALS_PINGED",
+              "HOSPITAL_ASSIGNED"
+            ].includes(
+              activeEmergency.status
+            )
+          ) {
+
+            setStep("searching");
+          }
+
+
+          // Restore map destination
+          if (
+            activeEmergency.assignedHospital
+          ) {
+
+            onRouteChange?.(
+              activeEmergency.assignedHospital
+            );
+          }
+
+        } catch (error) {
+
+          console.error(
+            "❌ Failed to restore active emergency:",
+            error
+          );
+        }
+      };
+
+
+    restoreActiveEmergency();
+
+  }, [onRouteChange]);
   /*
-   * Listen for the hospital accepting this emergency.
+   * Listen for hospital assignment.
    *
-   * Socket.IO is responsible for the real-time update.
-   * REST/MongoDB remains the source of truth.
+   * Socket.IO provides the real-time assignment update.
    */
   useEffect(() => {
-    const handleEmergencyAssigned = (data) => {
-      console.log("🏥 ASSIGNMENT EVENT RECEIVED:", data);
 
-      const assignedHospital = data?.hospital;
+    const handleEmergencyAssigned = (data) => {
+
+      console.log(
+        "🏥 ASSIGNMENT EVENT RECEIVED:",
+        data
+      );
+
+      const assignedHospital =
+        data?.hospital;
+
 
       if (!assignedHospital) {
+
         console.error(
           "❌ emergency:assigned received without hospital:",
           data
         );
+
         return;
       }
 
+
       setRequest((previous) => {
-        console.log("📦 Previous emergency state:", previous);
+
+        console.log(
+          "📦 Previous emergency state:",
+          previous
+        );
+
 
         if (!previous) {
+
           console.warn(
             "⚠️ Assignment received but no emergency request exists in UI."
           );
+
           return previous;
         }
+
 
         const updatedRequest = {
           ...previous,
@@ -108,50 +205,82 @@ export default function EmergencyRequestPanel({
           assignedHospital,
         };
 
+
         console.log(
           "✅ Updated emergency state:",
           updatedRequest
         );
 
+
         return updatedRequest;
       });
 
-      onRouteChange?.(assignedHospital);
+
+      onRouteChange?.(
+        assignedHospital
+      );
     };
 
-    socket.on("emergency:assigned", handleEmergencyAssigned);
+
+    socket.on(
+      "emergency:assigned",
+      handleEmergencyAssigned
+    );
+
 
     return () => {
-      socket.off("emergency:assigned", handleEmergencyAssigned);
+      socket.off(
+        "emergency:assigned",
+        handleEmergencyAssigned
+      );
     };
+
   }, [onRouteChange]);
 
 
-  const voice = useSpeechRecognition();
+  const voice =
+    useSpeechRecognition();
 
-  // Voice transcript:
+
   // null = follow speech recognition
   // string = user's manual edit
-  const [typedTranscript, setTypedTranscript] = useState(null);
+  const [typedTranscript, setTypedTranscript] =
+    useState(null);
 
-  const voiceTranscript = typedTranscript ?? voice.transcript;
+
+  const voiceTranscript =
+    typedTranscript ?? voice.transcript;
 
 
   const toggleVoice = () => {
+
     if (voice.isListening) {
       return voice.stopListening();
     }
 
+
     setTypedTranscript(null);
+
     voice.clearTranscript();
+
     voice.startListening();
   };
 
 
-  const setField = (field, value) => {
-    if (field === "voiceTranscript") {
-      return setTypedTranscript(value);
+  const setField = (
+    field,
+    value
+  ) => {
+
+    if (
+      field === "voiceTranscript"
+    ) {
+
+      return setTypedTranscript(
+        value
+      );
     }
+
 
     setForm((prev) => ({
       ...prev,
@@ -160,43 +289,82 @@ export default function EmergencyRequestPanel({
   };
 
 
-  // Shared async action handler.
-  const run = async (action, fallbackMessage) => {
+  // ------------------------------------------------
+  // Shared async action handler
+  // ------------------------------------------------
+
+  const run = async (
+    action,
+    fallbackMessage
+  ) => {
+
     try {
+
       setLoading(true);
       setError("");
+
       await action();
+
     } catch (err) {
-      console.error(fallbackMessage, err);
-      setError(getErrorMessage(err, fallbackMessage));
+
+      console.error(
+        fallbackMessage,
+        err
+      );
+
+      setError(
+        getErrorMessage(
+          err,
+          fallbackMessage
+        )
+      );
+
     } finally {
+
       setLoading(false);
     }
   };
 
 
   const requireId = () => {
+
     if (!request?._id) {
-      throw new Error("Emergency request ID is missing.");
+
+      throw new Error(
+        "Emergency request ID is missing."
+      );
     }
   };
 
 
-  // ---------------------------------------------------------------- CREATE
+  // ------------------------------------------------
+  // CREATE
+  // ------------------------------------------------
 
   const handleCreate = (event) => {
+
     event.preventDefault();
 
+
     if (!emergencyLocation) {
-      return setError("Please select the emergency location.");
+
+      return setError(
+        "Please select the emergency location."
+      );
     }
 
-    const hasText = form.description.trim();
-    const hasVoice = voiceTranscript.trim();
+
+    const hasText =
+      form.description.trim();
+
+
+    const hasVoice =
+      voiceTranscript.trim();
+
 
     /*
-     * Only consider resources as provided if the user
-     * actually requested something.
+     * Only consider resources as provided if
+     * the user actually requested something.
      */
     const hasResources =
       form.resources.icuBeds > 0 ||
@@ -206,214 +374,394 @@ export default function EmergencyRequestPanel({
       form.resources.oxygenSupply === true ||
       form.resources.bloodBank === true;
 
+
     const hasQuickSelect =
       form.emergencyType ||
       form.patientCount ||
       hasResources;
 
-    if (!hasText && !hasVoice && !hasQuickSelect) {
+
+    if (
+      !hasText &&
+      !hasVoice &&
+      !hasQuickSelect
+    ) {
+
       return setError(
         "Please provide at least one emergency detail."
       );
     }
 
-    run(async () => {
-      const inputs = {};
 
-      // Text input
-      if (form.description.trim()) {
-        inputs.text = form.description.trim();
-      }
+    run(
+      async () => {
 
-      // Voice input
-      if (voiceTranscript.trim()) {
-        inputs.voiceTranscript = voiceTranscript.trim();
-      }
+        const inputs = {};
 
-      // Quick select
-      const quickSelect = {};
 
-      if (form.emergencyType) {
-        quickSelect.emergencyType = form.emergencyType;
-      }
+        // Text input
 
-      if (form.patientCount) {
-        quickSelect.patientCount = Number(form.patientCount);
-      }
+        if (
+          form.description.trim()
+        ) {
 
-      // Do NOT send empty/default resources.
-      if (hasResources) {
-        quickSelect.requiredResources = form.resources;
-      }
+          inputs.text =
+            form.description.trim();
+        }
 
-      // Only send quickSelect if it contains something.
-      if (Object.keys(quickSelect).length > 0) {
-        inputs.quickSelect = quickSelect;
-      }
 
-      const payload = {
-        inputs,
+        // Voice input
 
-        location: {
-          type: "Point",
-          coordinates: [
-            emergencyLocation.longitude,
-            emergencyLocation.latitude,
-          ],
-        },
-      };
+        if (
+          voiceTranscript.trim()
+        ) {
 
-      console.log("🚨 Emergency request payload:", payload);
+          inputs.voiceTranscript =
+            voiceTranscript.trim();
+        }
 
-      const response = await createEmergencyRequest(payload);
 
-      setRequest(response.data);
-      setStep("review");
-    }, "Unable to create emergency request.");
+        // Quick select
+
+        const quickSelect = {};
+
+
+        if (
+          form.emergencyType
+        ) {
+
+          quickSelect.emergencyType =
+            form.emergencyType;
+        }
+
+
+        if (
+          form.patientCount
+        ) {
+
+          quickSelect.patientCount =
+            Number(form.patientCount);
+        }
+
+
+        // Do NOT send empty/default resources
+
+        if (hasResources) {
+
+          quickSelect.requiredResources =
+            form.resources;
+        }
+
+
+        // Only send quickSelect if it contains something
+
+        if (
+          Object.keys(
+            quickSelect
+          ).length > 0
+        ) {
+
+          inputs.quickSelect =
+            quickSelect;
+        }
+
+
+        const payload = {
+          inputs,
+
+          location: {
+            type: "Point",
+
+            coordinates: [
+              emergencyLocation.longitude,
+              emergencyLocation.latitude,
+            ],
+          },
+        };
+
+
+        console.log(
+          "🚨 Emergency request payload:",
+          payload
+        );
+
+
+        const response =
+          await createEmergencyRequest(
+            payload
+          );
+
+
+        setRequest(
+          response.data
+        );
+
+        setStep("review");
+
+      },
+      "Unable to create emergency request."
+    );
   };
 
 
-  // ---------------------------------------------------------------- EDIT
+  // ------------------------------------------------
+  // EDIT
+  // ------------------------------------------------
 
   const handleStartEdit = () => {
+
     const requirements =
       request?.confirmedRequirements ||
       request?.aiParsedRequirements;
 
+
     if (!requirements) {
+
       return setError(
         "No confirmed requirements are available."
       );
     }
 
-    setEditRequirements(structuredClone(requirements));
+
+    setEditRequirements(
+      structuredClone(requirements)
+    );
+
     setError("");
+
     setStep("edit");
   };
 
 
-  const handleEditType = (value) => {
-    setEditRequirements((prev) => ({
-      ...prev,
-      emergencyType: value,
-    }));
-  };
+  const handleEditType = (
+    value
+  ) => {
 
-
-  const handleEditPatient = (index, field, value) => {
-    setEditRequirements((prev) => {
-      const patients = [...(prev?.patients || [])];
-
-      patients[index] = {
-        ...patients[index],
-        [field]: value,
-      };
-
-      return {
+    setEditRequirements(
+      (prev) => ({
         ...prev,
-        patients,
-      };
-    });
+        emergencyType: value,
+      })
+    );
   };
 
 
-  const handleEditResource = (field, value) => {
-    setEditRequirements((prev) => ({
-      ...prev,
-      requiredResources: {
-        ...(prev?.requiredResources || {}),
-        [field]: value,
-      },
-    }));
+  const handleEditPatient = (
+    index,
+    field,
+    value
+  ) => {
+
+    setEditRequirements(
+      (prev) => {
+
+        const patients = [
+          ...(prev?.patients || []),
+        ];
+
+
+        patients[index] = {
+          ...patients[index],
+          [field]: value,
+        };
+
+
+        return {
+          ...prev,
+          patients,
+        };
+      }
+    );
   };
 
 
-  const handleSaveEdit = (event) => {
+  const handleEditResource = (
+    field,
+    value
+  ) => {
+
+    setEditRequirements(
+      (prev) => ({
+        ...prev,
+
+        requiredResources: {
+          ...(prev?.requiredResources || {}),
+          [field]: value,
+        },
+      })
+    );
+  };
+
+
+  const handleSaveEdit = (
+    event
+  ) => {
+
     event.preventDefault();
 
-    run(async () => {
-      requireId();
 
-      const response = await updateEmergencyRequest(
-        request._id,
-        {
-          confirmedRequirements: editRequirements,
-        }
-      );
+    run(
+      async () => {
 
-      setRequest(response.data);
-      setEditRequirements(null);
-      setStep("review");
-    }, "Unable to update emergency requirements.");
+        requireId();
+
+
+        const response =
+          await updateEmergencyRequest(
+            request._id,
+            {
+              confirmedRequirements:
+                editRequirements,
+            }
+          );
+
+
+        setRequest(
+          response.data
+        );
+
+        setEditRequirements(null);
+
+        setStep("review");
+
+      },
+      "Unable to update emergency requirements."
+    );
   };
 
 
-  // --------------------------------------------------------- CANCEL / CONFIRM
+  // ------------------------------------------------
+  // CANCEL / CONFIRM
+  // ------------------------------------------------
 
   const handleCancel = () =>
-    run(async () => {
-      requireId();
+    run(
+      async () => {
 
-      await cancelEmergencyRequest(request._id);
+        requireId();
 
-      reset();
-    }, "Unable to cancel emergency request.");
+        await cancelEmergencyRequest(
+          request._id
+        );
+
+        reset();
+      },
+      "Unable to cancel emergency request."
+    );
 
 
   const handleConfirm = () =>
-    run(async () => {
-      requireId();
+    run(
+      async () => {
 
-      const response = await confirmEmergencyRequest(
-        request._id
-      );
+        requireId();
 
-      setRequest(response.data.emergency);
-      setStep("searching");
-    }, "Unable to confirm emergency request.");
 
+        const response =
+          await confirmEmergencyRequest(
+            request._id
+          );
+
+
+        setRequest(
+          response.data.emergency
+        );
+
+        setStep("searching");
+
+      },
+      "Unable to confirm emergency request."
+    );
+
+
+  // ------------------------------------------------
+  // HANDOVER COMPLETE
+  // ------------------------------------------------
+
+  const handleHandoverComplete = (
+    completedEmergency
+  ) => {
+
+    setRequest(
+      completedEmergency
+    );
+
+    onRouteChange?.(
+      null
+    );
+  };
+
+
+  // ------------------------------------------------
+  // RESET
+  // ------------------------------------------------
 
   const reset = () => {
+
     setRequest(null);
+
     setEditRequirements(null);
+
 
     setForm({
       ...EMPTY_FORM,
-      resources: { ...EMPTY_RESOURCES },
+
+      resources: {
+        ...EMPTY_RESOURCES,
+      },
     });
 
+
     setTypedTranscript(null);
+
     voice.clearTranscript();
 
     setError("");
 
-    // Reset emergency location to current ambulance location.
-    setEmergencyLocation(location || null);
 
-    onRouteChange?.(null);
+    // Reset emergency location to
+    // current ambulance location
+
+    setEmergencyLocation(
+      location || null
+    );
+
+
+    onRouteChange?.(
+      null
+    );
+
 
     setStep("form");
   };
 
 
-  // ---------------------------------------------------------------- RENDER
+  // ------------------------------------------------
+  // RENDER
+  // ------------------------------------------------
 
   return (
     <>
       <Card className="p-0">
+
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+
           <h2 className="flex min-w-0 items-center gap-2.5 text-subtitle font-semibold text-ink">
+
             <span className="h-2 w-2 shrink-0 rounded-full bg-primary ring-4 ring-primary/30" />
 
             <span className="truncate">
               {STEP_TITLES[step]}
             </span>
+
           </h2>
+
 
           <Badge
             tone="accent"
             className="whitespace-nowrap"
           >
+
             <Sparkles size={12} />
 
             <span className="hidden sm:inline">
@@ -421,10 +769,14 @@ export default function EmergencyRequestPanel({
             </span>
 
             AI
+
           </Badge>
+
         </div>
 
+
         <div className="p-5">
+
           {step === "form" && (
             <CreateRequestForm
               values={{
@@ -438,15 +790,21 @@ export default function EmergencyRequestPanel({
               onSubmit={handleCreate}
               onReset={reset}
               voice={{
-                isListening: voice.isListening,
-                error: voice.error,
-                toggle: toggleVoice,
+                isListening:
+                  voice.isListening,
+
+                error:
+                  voice.error,
+
+                toggle:
+                  toggleVoice,
               }}
               onOpenLocationPicker={() =>
                 setShowLocationPicker(true)
               }
             />
           )}
+
 
           {step === "review" && (
             <ReviewRequest
@@ -459,42 +817,83 @@ export default function EmergencyRequestPanel({
             />
           )}
 
+
           {step === "edit" && (
             <EditRequest
-              requirements={editRequirements}
+              requirements={
+                editRequirements
+              }
               loading={loading}
               error={error}
-              onTypeChange={handleEditType}
-              onPatientChange={handleEditPatient}
-              onResourceChange={handleEditResource}
-              onSubmit={handleSaveEdit}
+              onTypeChange={
+                handleEditType
+              }
+              onPatientChange={
+                handleEditPatient
+              }
+              onResourceChange={
+                handleEditResource
+              }
+              onSubmit={
+                handleSaveEdit
+              }
               onBack={() => {
-                setEditRequirements(null);
+
+                setEditRequirements(
+                  null
+                );
+
                 setError("");
+
                 setStep("review");
               }}
             />
           )}
 
+
           {step === "searching" && (
             <SearchingRequest
               request={request}
               hospitals={hospitals}
+              location={location}
+              onHandoverComplete={
+                handleHandoverComplete
+              }
               onReset={reset}
             />
           )}
+
         </div>
+
       </Card>
 
+
       <LocationPicker
-        open={showLocationPicker}
-        initialLocation={emergencyLocation}
-        onConfirm={(selectedLocation) => {
-          setEmergencyLocation(selectedLocation);
-          setShowLocationPicker(false);
+        open={
+          showLocationPicker
+        }
+        initialLocation={
+          emergencyLocation
+        }
+        onConfirm={(
+          selectedLocation
+        ) => {
+
+          setEmergencyLocation(
+            selectedLocation
+          );
+
+          setShowLocationPicker(
+            false
+          );
         }}
-        onClose={() => setShowLocationPicker(false)}
+        onClose={() =>
+          setShowLocationPicker(
+            false
+          )
+        }
       />
+
     </>
   );
 }

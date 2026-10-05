@@ -763,3 +763,51 @@ export const confirmEmergencyRequest = async (
     next(error);
   }
 };
+
+export const getActiveEmergencyRequest =
+  async (req, res, next) => {
+
+    try {
+
+      const emergency =
+        await EmergencyRequest
+          .findOne({
+            ambulanceId: req.user._id,
+
+            status: {
+              $in: [
+                "PARSED",
+                "SEARCHING_HOSPITAL",
+                "HOSPITALS_PINGED",
+                "HOSPITAL_ASSIGNED"
+              ]
+            }
+          })
+          .sort({
+            createdAt: -1
+          })
+          .populate(
+            "assignedHospital",
+            "id name phone address location"
+          );
+
+
+      if (!emergency) {
+
+        return res.status(200).json({
+          success: true,
+          data: null
+        });
+      }
+
+
+      return res.status(200).json({
+        success: true,
+        data: emergency
+      });
+
+    } catch (error) {
+
+      next(error);
+    }
+  };

@@ -254,12 +254,31 @@ const emergencyRequestSchema = new mongoose.Schema(
       ],
       default: 'PARSED',
       required: true
-    }, 
-    
+    },
+
     assignedHospital: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Hospital',
       default: null
+    },
+
+    handover: {
+      status: {
+        type: String,
+        enum: ['PENDING', 'COMPLETED'],
+        default: 'PENDING'
+      },
+
+      type: {
+        type: String,
+        enum: ['ARRIVED', 'ANYWAY'],
+        default: null
+      },
+
+      completedAt: {
+        type: Date,
+        default: null
+      }
     },
   },
   {
