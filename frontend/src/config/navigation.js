@@ -11,7 +11,7 @@ export const PORTALS = {
   AMBULANCE: {
     label: "Ambulance Portal",
     basePath: "/ambulance",
-    logoutLabel: "Logout Session",
+    logoutLabel: "Logout",
     nav: [
       { label: "Home", path: "", icon: LayoutGrid },
       { label: "Requests", path: "requests", icon: TriangleAlert, badge: "requests" },

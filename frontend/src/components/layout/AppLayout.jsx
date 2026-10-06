@@ -31,7 +31,7 @@ export default function AppLayout({ role, basePath }) {
         onLogout={logout}
       />
 
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-workspace md:my-3 md:mr-3 md:rounded-panel">
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto scrollbar-hide bg-workspace md:my-3 md:mr-3 md:rounded-panel">
         <Header user={user} profilePath={`${base}/profile`} notificationCount={badges.requests} />
         <Outlet />
       </main>

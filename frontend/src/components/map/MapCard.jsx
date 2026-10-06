@@ -28,12 +28,12 @@ export default function MapCard({
    */
   const resolvedRouteHospital = routeHospital
     ? hospitals.find(
-      (hospital) =>
-        String(hospital._id) ===
-        String(routeHospital._id) ||
-        String(hospital.id) ===
-        String(routeHospital.id)
-    ) || routeHospital
+        (hospital) =>
+          String(hospital._id) ===
+            String(routeHospital._id) ||
+          String(hospital.id) ===
+            String(routeHospital.id)
+      ) || routeHospital
     : null;
 
   /*
@@ -57,20 +57,19 @@ export default function MapCard({
     assignedPoint
   );
 
-
   return (
-    <div className="flex min-h-[520px] flex-col overflow-hidden rounded-card border border-line bg-card shadow-card">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-card border border-line bg-card shadow-card">
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <span className="h-2 w-2 rounded-full bg-primary ring-4 ring-primary/30" />
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-primary ring-4 ring-primary/30" />
 
-          <h2 className="text-body font-semibold text-ink">
+          <h2 className="truncate text-body font-semibold text-ink">
             Live Dispatch Map
           </h2>
 
-          <span className="hidden font-mono text-label text-ink-muted sm:inline">
+          <span className="hidden shrink-0 font-mono text-label text-ink-muted sm:inline">
             {location
               ? "• GPS active"
               : "• Waiting for GPS"}
@@ -83,8 +82,8 @@ export default function MapCard({
         </Badge>
       </div>
 
-      {/* Map */}
-      <div className="relative min-h-[420px] flex-1">
+      {/* Fixed map area */}
+      <div className="relative min-h-0 flex-1">
 
         <LiveMap
           ambulance={location}
@@ -118,14 +117,16 @@ export default function MapCard({
           </div>
         )}
 
+        {/* Route information */}
         {assignedPoint && route && (
           <div className="absolute bottom-4 left-4 z-[500] flex items-center gap-3 rounded-card border border-line bg-card/95 p-3.5 shadow-float backdrop-blur">
+
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-field bg-primary-soft text-primary-strong">
               <Navigation size={18} />
             </span>
 
-            <div>
-              <p className="text-body font-semibold text-ink">
+            <div className="min-w-0">
+              <p className="truncate text-body font-semibold text-ink">
                 {resolvedRouteHospital?.name}
               </p>
 
@@ -142,6 +143,7 @@ export default function MapCard({
                 min away
               </p>
             </div>
+
           </div>
         )}
 

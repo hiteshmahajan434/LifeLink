@@ -18,7 +18,7 @@ const AmbulanceHome = () => {
         subtitle="Real-time ambulance dispatch & live hospital routing"
       />
 
-      <div className="grid grid-cols-1 gap-6 px-6 pb-8 lg:px-8 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <div className="grid h-[calc(100dvh-140px)] min-h-0 grid-cols-1 gap-6 px-6 pb-8 lg:px-8 xl:grid-cols-[420px_minmax(0,1fr)]">
         <EmergencyRequestPanel
           location={location}
           hospitals={hospitals}

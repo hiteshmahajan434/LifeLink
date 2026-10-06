@@ -28,7 +28,8 @@
   --p-lime-700: #101303;
 
   /* grey */
-  --p-grey-100: #E1E1E1;
+  /* --p-grey-100: #E8E8E8; */
+  --p-grey-100: #E0E0E0;
   --p-grey-200: #B9B9B9;
   --p-grey-300: #939393;
   --p-grey-400: #6F6F6F;
@@ -130,16 +131,31 @@
 
 /* ------------------------------ TYPE, RADII, SHADOWS ------------------------------ */
 @theme {
-  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: Manrope, ui-sans-serif, system-ui, sans-serif;
 
-  /* Stitch type scale */
-  --text-display: 36px;   --text-display--line-height: 44px;
-  --text-headline: 28px;  --text-headline--line-height: 36px;
-  --text-title: 20px;     --text-title--line-height: 26px;
-  --text-subtitle: 16px;  --text-subtitle--line-height: 22px;
-  --text-body: 13px;      --text-body--line-height: 18px;
-  --text-caption: 12px;   --text-caption--line-height: 16px;
-  --text-label: 11px;     --text-label--line-height: 14px;
+/* Typography */
+--font-sans: Manrope, ui-sans-serif, system-ui, sans-serif;
+
+--text-display: 40px;
+--text-display--line-height: 46px;
+
+--text-headline: 32px;
+--text-headline--line-height: 38px;
+
+--text-title: 18px;
+--text-title--line-height: 24px;
+
+--text-subtitle: 15px;
+--text-subtitle--line-height: 21px;
+
+--text-body: 14px;
+--text-body--line-height: 20px;
+
+--text-caption: 12px;
+--text-caption--line-height: 16px;
+
+--text-label: 11px;
+--text-label--line-height: 14px;
 
   /* Stitch shapes */
   --radius-field: 0.75rem;   /* inputs, small buttons */

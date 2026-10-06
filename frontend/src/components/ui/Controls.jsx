@@ -59,7 +59,16 @@ export function Stepper({ label, value, onChange, min = 0, max = 99 }) {
  * Pill selector. options: [{ value, label }]
  * variant "chips" = separate pills, "segmented" = one joined track (Ambulance | Hospital)
  */
-export function ChipGroup({ options, value, onChange, variant = "chips", className }) {
+export function ChipGroup({ options, value, onChange, variant = "chips", className, allowToggle = false }) {
+  const handleSelect = (optionValue) => {
+    if (allowToggle && value === optionValue) {
+      onChange(null);
+      return;
+    }
+
+    onChange(optionValue);
+  };
+
   if (variant === "segmented") {
     return (
       <div role="tablist" className={cn("flex gap-1 rounded-full bg-workspace p-1", className)}>
@@ -68,7 +77,8 @@ export function ChipGroup({ options, value, onChange, variant = "chips", classNa
             key={o.value}
             role="tab"
             aria-selected={value === o.value}
-            onClick={() => onChange(o.value)}
+            onClick={() => handleSelect(o.value)}
+            onDoubleClick={() => allowToggle && value === o.value && onChange(null)}
             className={cn(
               "flex-1 rounded-full px-4 py-2 text-body font-semibold transition",
               value === o.value ? "bg-card text-ink shadow-card" : "text-ink-soft hover:text-ink"
@@ -87,7 +97,8 @@ export function ChipGroup({ options, value, onChange, variant = "chips", classNa
           key={o.value}
           type="button"
           aria-pressed={value === o.value}
-          onClick={() => onChange(o.value)}
+          onClick={() => handleSelect(o.value)}
+          onDoubleClick={() => allowToggle && value === o.value && onChange(null)}
           className={cn(
             "rounded-full border px-4 py-2 text-caption font-semibold transition",
             value === o.value
