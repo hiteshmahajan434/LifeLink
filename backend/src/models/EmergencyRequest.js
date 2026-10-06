@@ -250,6 +250,7 @@ const emergencyRequestSchema = new mongoose.Schema(
         'SEARCHING_HOSPITAL',
         'HOSPITALS_PINGED',
         'HOSPITAL_ASSIGNED',
+        'NO_HOSPITAL_AVAILABLE',
         'COMPLETED'
       ],
       default: 'PARSED',

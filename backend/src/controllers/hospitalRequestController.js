@@ -5,9 +5,7 @@ import Hospital from '../models/Hospital.js';
 
 import { getIO } from '../socket/socket.js';
 
-import {
-  checkBatchAndCreateNext
-} from '../services/hospitalMatchingService.js';
+import { checkBatchAndCreateNext } from '../services/hospitalMatchingService.js';
 
 // --------------------------------------------------
 // GET hospital requests

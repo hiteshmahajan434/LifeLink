@@ -8,11 +8,25 @@ import hospitalResourceRoutes from './routes/hospitalResourceRoutes.js';
 import hospitalRequestRoutes from './routes/hospitalRequestRoutes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorMiddleware.js';
 
+import { serve } from "inngest/express";
+import { inngest } from "./inngest/client.js";
+import { hospitalBatchTimeout } from './inngest/hospitalBatchTimeout.js';
+
 const app = express();
 
 // Global middleware
 app.use(cors());
 app.use(express.json());
+
+app.use(
+  "/api/inngest",
+  serve({
+    client: inngest,
+    functions: [
+        hospitalBatchTimeout
+    ],
+  })
+);
 
 // Base API Routes
 app.use('/api/health', healthRoutes);

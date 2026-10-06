@@ -4,7 +4,9 @@ import HospitalEmergencyRequest from '../models/HospitalEmergencyRequest.js';
 import EmergencyRequest from '../models/EmergencyRequest.js';
 
 import { getIO } from '../socket/socket.js';
-import { getRoadDistances } from './routingService.js';
+import { getRoadDistances } from '../services/routingService.js';
+
+import { inngest } from '../inngest/client.js';
 
 const BATCH_SIZE = 2;
 
@@ -67,8 +69,6 @@ const hasRequiredResources = (
   return true;
 };
 
-
-
 // --------------------------------------------------
 // Create next hospital batch
 // --------------------------------------------------
@@ -77,13 +77,18 @@ export const createHospitalBatch = async (
   emergency,
   batchNumber
 ) => {
+  console.log(`🚀 Creating Batch ${batchNumber}`);
+
   const requiredResources =
     emergency.confirmedRequirements.requiredResources;
 
   const emergencyCoordinates =
     emergency.location.coordinates;
 
+  // --------------------------------------------------
   // Get all hospitals
+  // --------------------------------------------------
+
   const hospitals = await Hospital.find({
     location: { $exists: true }
   }).lean();
@@ -96,7 +101,10 @@ export const createHospitalBatch = async (
     };
   }
 
+  // --------------------------------------------------
   // Find hospitals already contacted
+  // --------------------------------------------------
+
   const previousRequests =
     await HospitalEmergencyRequest.find({
       emergencyId: emergency._id
@@ -112,7 +120,10 @@ export const createHospitalBatch = async (
       )
     );
 
+  // --------------------------------------------------
   // Get hospital resources
+  // --------------------------------------------------
+
   const hospitalIds =
     hospitals.map(
       hospital => hospital._id
@@ -134,6 +145,9 @@ export const createHospitalBatch = async (
     );
   }
 
+  // --------------------------------------------------
+  // Find eligible hospitals
+  // --------------------------------------------------
 
   const eligibleHospitals = [];
 
@@ -172,6 +186,9 @@ export const createHospitalBatch = async (
   }
 
   if (eligibleHospitals.length === 0) {
+    console.log(
+      `❌ No more suitable hospitals available for Batch ${batchNumber}`
+    );
     return {
       success: false,
       message:
@@ -180,8 +197,13 @@ export const createHospitalBatch = async (
     };
   }
 
+  // --------------------------------------------------
+  // Calculate road distances
+  // --------------------------------------------------
+
   const roadDistances = await getRoadDistances({
     origin: emergencyCoordinates,
+
     destinations: eligibleHospitals.map(
       ({ hospital }) =>
         hospital.location.coordinates
@@ -198,18 +220,27 @@ export const createHospitalBatch = async (
     }
   );
 
-  // Nearest hospitals first
+  // --------------------------------------------------
+  // Rank nearest hospitals first
+  // --------------------------------------------------
+
   eligibleHospitals.sort((a, b) => {
     if (a.distanceKm !== b.distanceKm) {
       return a.distanceKm - b.distanceKm;
     }
 
-    return a.durationMinutes - b.durationMinutes;
+    return (
+      a.durationMinutes -
+      b.durationMinutes
+    );
   });
 
   console.log(eligibleHospitals);
 
+  // --------------------------------------------------
   // Select next batch
+  // --------------------------------------------------
+
   const selectedHospitals =
     eligibleHospitals.slice(
       0,
@@ -227,12 +258,20 @@ export const createHospitalBatch = async (
     };
   }
 
+  // --------------------------------------------------
+  // Create response window
+  // --------------------------------------------------
+
   const sentAt = new Date();
 
   const expiresAt = new Date(
     sentAt.getTime() +
     HOSPITAL_RESPONSE_WINDOW_MS
   );
+
+  // --------------------------------------------------
+  // Create HospitalEmergencyRequest documents
+  // --------------------------------------------------
 
   const hospitalRequests =
     await HospitalEmergencyRequest.insertMany(
@@ -261,37 +300,67 @@ export const createHospitalBatch = async (
 
   const io = getIO();
 
-  hospitalRequests.forEach((request, index) => {
-    const hospital = selectedHospitals[index].hospital;
+  hospitalRequests.forEach(
+    (request, index) => {
+      const hospital =
+        selectedHospitals[index].hospital;
 
-    io.to(`hospital:${hospital.id}`).emit(
-      'emergency:new',
-      {
-        _id: request._id,
+      io.to(
+        `hospital:${hospital.id}`
+      ).emit(
+        'emergency:new',
+        {
+          _id: request._id,
 
-        emergencyId: {
-          _id: emergency._id,
-          id: emergency.id,
-          location: emergency.location,
-          confirmedRequirements:
-            emergency.confirmedRequirements,
-          status: emergency.status,
-          createdAt: emergency.createdAt
-        },
+          emergencyId: {
+            _id: emergency._id,
+            id: emergency.id,
+            location:
+              emergency.location,
+            confirmedRequirements:
+              emergency.confirmedRequirements,
+            status:
+              emergency.status,
+            createdAt:
+              emergency.createdAt
+          },
 
-        hospitalId: hospital._id,
+          hospitalId:
+            hospital._id,
 
-        status: 'PENDING',
+          status: 'PENDING',
 
-        batchNumber,
+          batchNumber,
 
-        sentAt,
-        expiresAt,
+          sentAt,
+          expiresAt,
 
-        createdAt: request.createdAt
-      }
-    );
+          createdAt:
+            request.createdAt
+        }
+      );
+    }
+  );
+
+  // --------------------------------------------------
+  // Schedule durable timeout using Inngest
+  // --------------------------------------------------
+
+  console.log(`📨 Sending Inngest timeout for Batch ${batchNumber}`);
+
+  await inngest.send({
+    name: 'hospital/batch.timeout',
+    data: {
+      emergencyId: emergency._id.toString(),
+      batchNumber
+    }
   });
+
+  console.log(`⏳ Inngest timeout scheduled for Batch ${batchNumber}`);
+
+  // --------------------------------------------------
+  // Return batch information
+  // --------------------------------------------------
 
   return {
     success: true,
@@ -337,9 +406,9 @@ export const checkBatchAndCreateNext =
     batchNumber
   ) => {
     const emergency =
-      await EmergencyRequest.findById(
-        emergencyId
-      );
+      await EmergencyRequest
+        .findById(emergencyId)
+        .populate('ambulanceId', 'id');
 
     if (!emergency) {
       return {
@@ -367,7 +436,8 @@ export const checkBatchAndCreateNext =
     if (batchRequests.length === 0) {
       return {
         success: false,
-        message: 'Hospital batch not found'
+        message:
+          'Hospital batch not found'
       };
     }
 
@@ -398,9 +468,19 @@ export const checkBatchAndCreateNext =
       );
 
     if (!nextBatch.success) {
-      emergency.status = 'CONFIRMED';
-
+      emergency.status = 'NO_HOSPITAL_AVAILABLE';
       await emergency.save();
+
+      const io = getIO();
+
+      io.to(`ambulance:${emergency.ambulanceId.id}`).emit(
+        'emergency:no-hospital',
+        {
+          emergencyId: emergency._id,
+          status: 'NO_HOSPITAL_AVAILABLE',
+          message: 'No suitable hospital is available at the moment.'
+        }
+      );
 
       return nextBatch;
     }
@@ -411,62 +491,4 @@ export const checkBatchAndCreateNext =
     await emergency.save();
 
     return nextBatch;
-  };
-
-// --------------------------------------------------
-// Expire requests whose 1-minute window ended
-// --------------------------------------------------
-
-export const processExpiredHospitalRequests =
-  async () => {
-    const now = new Date();
-
-    const expiredRequests =
-      await HospitalEmergencyRequest.find({
-        status: 'PENDING',
-        expiresAt: {
-          $lte: now
-        }
-      });
-
-    const affectedBatches = new Map();
-
-    for (const request of expiredRequests) {
-      request.status = 'EXPIRED';
-      request.respondedAt = now;
-
-      await request.save();
-
-      const key =
-        `${request.emergencyId.toString()}_${request.batchNumber}`;
-
-      affectedBatches.set(
-        key,
-        {
-          emergencyId:
-            request.emergencyId,
-          batchNumber:
-            request.batchNumber
-        }
-      );
-    }
-
-    // Check affected batches
-    for (
-      const {
-        emergencyId,
-        batchNumber
-      } of affectedBatches.values()
-    ) {
-      await checkBatchAndCreateNext(
-        emergencyId,
-        batchNumber
-      );
-    }
-
-    return {
-      success: true,
-      expiredCount:
-        expiredRequests.length
-    };
   };
