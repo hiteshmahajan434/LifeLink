@@ -39,6 +39,7 @@ const STEP_TITLES = {
 export default function EmergencyRequestPanel({
   location,
   hospitals = [],
+  route,
   onRouteChange,
 }) {
   const [step, setStep] = useState("form");
@@ -669,7 +670,7 @@ export default function EmergencyRequestPanel({
         </div>
 
         {/* Scrollable content */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 scrollbar-hide">
+<div className="min-h-0 flex-1 overflow-hidden p-5">
 
           {step === "form" && (
             <CreateRequestForm
@@ -714,6 +715,7 @@ export default function EmergencyRequestPanel({
 
           {step === "edit" && (
             <EditRequest
+              request={request}
               requirements={
                 editRequirements
               }
@@ -748,10 +750,12 @@ export default function EmergencyRequestPanel({
               request={request}
               hospitals={hospitals}
               location={location}
+              route={route}
               onHandoverComplete={
                 handleHandoverComplete
               }
               onReset={reset}
+              onCancel={handleCancel}
             />
           )}
 

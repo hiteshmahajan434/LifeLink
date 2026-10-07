@@ -417,6 +417,13 @@ export const checkBatchAndCreateNext =
       };
     }
 
+    if (emergency.status === 'CANCELLED') {
+      return {
+        success: false,
+        message: 'Emergency has been cancelled',
+      };
+    }
+
     // Someone already accepted
     if (emergency.assignedHospital) {
       return {

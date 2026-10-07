@@ -53,6 +53,18 @@ export const hospitalBatchTimeout =
         };
       }
 
+      // Emergency was cancelled
+      if (emergency.status === 'CANCELLED') {
+        console.log(
+          `🚫 Emergency ${emergencyId} was cancelled. Stopping timeout.`
+        );
+
+        return {
+          success: true,
+          message: 'Emergency was cancelled',
+        };
+      }
+
       // --------------------------------------------------
       // Someone already accepted
       // --------------------------------------------------

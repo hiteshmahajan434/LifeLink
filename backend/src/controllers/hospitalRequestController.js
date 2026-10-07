@@ -120,6 +120,7 @@ export const acceptHospitalRequest =
       }
 
       // Get emergency
+      // Get emergency
       const emergency =
         await EmergencyRequest.findById(
           hospitalRequest.emergencyId
@@ -131,18 +132,27 @@ export const acceptHospitalRequest =
       if (!emergency) {
         return res.status(404).json({
           success: false,
-          message:
-            'Emergency request not found'
+          message: 'Emergency request not found'
+        });
+      }
+
+      // Emergency was cancelled by ambulance
+      if (emergency.status === 'CANCELLED') {
+        hospitalRequest.status = 'CANCELLED';
+        hospitalRequest.respondedAt = new Date();
+
+        await hospitalRequest.save();
+
+        return res.status(409).json({
+          success: false,
+          message: 'This emergency has been cancelled'
         });
       }
 
       // Another hospital already accepted
       if (emergency.assignedHospital) {
-        hospitalRequest.status =
-          'CANCELLED';
-
-        hospitalRequest.respondedAt =
-          new Date();
+        hospitalRequest.status = 'CANCELLED';
+        hospitalRequest.respondedAt = new Date();
 
         await hospitalRequest.save();
 
@@ -184,7 +194,7 @@ export const acceptHospitalRequest =
       ) {
         const requiredAmount =
           requiredResources[
-            resourceType
+          resourceType
           ] ?? 0;
 
         if (
@@ -195,7 +205,7 @@ export const acceptHospitalRequest =
 
         const resource =
           hospitalResource[
-            resourceType
+          resourceType
           ];
 
         const available =
@@ -218,9 +228,9 @@ export const acceptHospitalRequest =
       // Check boolean resources
       if (
         requiredResources.oxygenSupply ===
-          true &&
+        true &&
         hospitalResource.oxygenSupply !==
-          true
+        true
       ) {
         return res.status(409).json({
           success: false,
@@ -231,9 +241,9 @@ export const acceptHospitalRequest =
 
       if (
         requiredResources.bloodBank ===
-          true &&
+        true &&
         hospitalResource.bloodBank !==
-          true
+        true
       ) {
         return res.status(409).json({
           success: false,
@@ -248,7 +258,7 @@ export const acceptHospitalRequest =
       ) {
         const requiredAmount =
           requiredResources[
-            resourceType
+          resourceType
           ] ?? 0;
 
         hospitalResource[
@@ -300,7 +310,7 @@ export const acceptHospitalRequest =
 
       const hospital = await Hospital.findById(hospitalId)
         .select('id name location');
-      
+
       if (!hospital) {
         return res.status(404).json({
           success: false,

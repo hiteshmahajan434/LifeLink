@@ -11,12 +11,13 @@ import {
   toLatLng,
 } from "../../utils/geo";
 
-import useDrivingRoute from "../../hooks/useDrivingRoute";
-
 export default function MapCard({
   location,
   hospitals = [],
   routeHospital,
+  route,
+  routeLoading,
+  routeError,
   error,
 }) {
   /*
@@ -44,18 +45,6 @@ export default function MapCard({
     resolvedRouteHospital && location
       ? toLatLng(resolvedRouteHospital)
       : null;
-
-  /*
-   * Calculate the actual road route.
-   */
-  const {
-    route,
-    loading: routeLoading,
-    error: routeError,
-  } = useDrivingRoute(
-    location,
-    assignedPoint
-  );
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-card border border-line bg-card shadow-card">

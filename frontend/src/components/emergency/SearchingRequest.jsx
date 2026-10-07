@@ -1,10 +1,10 @@
 import {
-  Check,
   CircleAlert,
   Hospital,
   LoaderCircle,
-  Phone,
   MapPin,
+  Phone,
+  Check,
 } from "lucide-react";
 
 import {
@@ -14,67 +14,37 @@ import {
   StatusBadge,
 } from "../ui";
 
-import { cn } from "../../utils/cn";
+import { distanceKm, toLatLng } from "../../utils/geo";
 
-import {
-  distanceKm,
-  toLatLng,
-} from "../../utils/geo";
-
-import {
-  completeHandover,
-} from "../../api/emergency.api";
+import { completeHandover } from "../../api/emergency.api";
 
 const HANDOVER_RADIUS_KM = 0.2;
-
-const STEPS = [
-  {
-    label: "Requirements confirmed",
-    done: () => true,
-  },
-
-  {
-    label: "Hospitals notified",
-    done: () => true,
-  },
-
-  {
-    label: "Hospital assigned",
-    done: (status) =>
-      [
-        "HOSPITAL_ASSIGNED",
-        "COMPLETED",
-      ].includes(status),
-  },
-];
 
 export default function SearchingRequest({
   request,
   hospitals = [],
   location,
+  route,
   onHandoverComplete,
   onReset,
+  onCancel
 }) {
-  /*
-   * Request state is updated directly
-   * by Socket.IO / parent state.
-   */
   const live = request;
 
   const assigned =
     live?.status === "HOSPITAL_ASSIGNED" ||
     live?.status === "COMPLETED";
 
+  const completed =
+    live?.status === "COMPLETED";
+
   const noHospitalAvailable =
     live?.status === "NO_HOSPITAL_AVAILABLE";
 
-  /*
-   * assignedHospital can be:
-   *
-   * 1. A populated hospital object
-   * 2. A MongoDB ObjectId
-   * 3. A public hospital ID such as HOSP-101
-   */
+  // =================================================
+  // Resolve assigned hospital
+  // =================================================
+
   const hospital = (() => {
     if (!live?.assignedHospital) {
       return null;
@@ -86,22 +56,16 @@ export default function SearchingRequest({
           live.assignedHospital.id
         : live.assignedHospital;
 
-    const matchedHospital =
-      hospitals.find(
-        (hospital) =>
-          String(hospital._id) ===
-            String(assignedId) ||
-          String(hospital.id) ===
-            String(assignedId)
-      );
+    const matchedHospital = hospitals.find(
+      (hospital) =>
+        String(hospital._id) === String(assignedId) ||
+        String(hospital.id) === String(assignedId)
+    );
 
-    // Prefer the complete hospital
-    // from the hospitals list.
     if (matchedHospital) {
       return matchedHospital;
     }
 
-    // Fallback to populated assignedHospital.
     if (
       typeof live.assignedHospital === "object"
     ) {
@@ -111,11 +75,28 @@ export default function SearchingRequest({
     return null;
   })();
 
-  // ------------------------------------------------
-  // Distance to assigned hospital
-  // ------------------------------------------------
+  const completedAt =
+    live?.completedAt ||
+    live?.handoverCompletedAt ||
+    live?.updatedAt ||
+    null;
 
-  let distance = null;
+  const formattedCompletedAt = completedAt
+    ? new Date(completedAt).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : null;
+
+  // =================================================
+  // Handover proximity
+  // =================================================
+
+  let proximityDistance = null;
   let canHandover = false;
 
   if (
@@ -123,11 +104,10 @@ export default function SearchingRequest({
     location &&
     hospital?.location
   ) {
-    const hospitalPoint =
-      toLatLng(hospital);
+    const hospitalPoint = toLatLng(hospital);
 
     if (hospitalPoint) {
-      distance = distanceKm(
+      proximityDistance = distanceKm(
         location.latitude,
         location.longitude,
         hospitalPoint.latitude,
@@ -135,62 +115,82 @@ export default function SearchingRequest({
       );
 
       canHandover =
-        distance <= HANDOVER_RADIUS_KM;
+        proximityDistance <= HANDOVER_RADIUS_KM;
     }
   }
 
-  // ------------------------------------------------
+  // =================================================
+  // Road distance + ETA
+  // =================================================
+
+  const roadDistanceKm =
+    route?.distanceMeters != null
+      ? route.distanceMeters / 1000
+      : null;
+
+  const roadDurationMinutes =
+    route?.durationSeconds != null
+      ? Math.max(
+          1,
+          Math.ceil(route.durationSeconds / 60)
+        )
+      : null;
+
+  // =================================================
   // Handover
-  // ------------------------------------------------
+  // =================================================
 
-  const handleHandover = async (
-    type
-  ) => {
+  const handleHandover = async (type) => {
     if (!live?._id) {
-      console.error(
-        "❌ Emergency ID is missing."
-      );
-
+      console.error("❌ Emergency ID is missing.");
       return;
     }
 
     try {
-      const response =
-        await completeHandover(
-          live._id,
-          type
-        );
+      // Capture the actual completion time and resolved hospital
+      // before the emergency status changes to COMPLETED.
+      const handoverTime = new Date().toISOString();
+      const hospitalAtHandover = hospital;
 
-      console.log(
-        "✅ Handover completed:",
-        response
+      const response = await completeHandover(
+        live._id,
+        type
       );
 
-      onHandoverComplete?.(
-        response.emergency
-      );
+      console.log("✅ Handover completed:", response);
+
+      const completedEmergency = {
+        ...response.emergency,
+        completedAt:
+          response.emergency?.completedAt ||
+          response.emergency?.handoverCompletedAt ||
+          handoverTime,
+        assignedHospital:
+          response.emergency?.assignedHospital ||
+          hospitalAtHandover,
+      };
+
+      onHandoverComplete?.(completedEmergency);
     } catch (error) {
-      console.error(
-        "❌ Handover failed:",
-        error
-      );
+      console.error("❌ Handover failed:", error);
     }
   };
 
-  // ------------------------------------------------
-  // Render
-  // ------------------------------------------------
+  // =================================================
+  // RENDER
+  // =================================================
 
   return (
-    <div className="space-y-5">
+    <div className="flex h-full min-h-0 flex-col">
 
-      {/* Emergency ID + current status */}
+      {/* =================================================
+          HEADER
+      ================================================= */}
 
-      <div className="flex items-center justify-between">
+      <div className="flex shrink-0 items-center justify-between">
 
         <Badge tone="accent">
-          Emergency{" "}
-          {live?.id || "Unknown"}
+          Emergency {live?.id || "Unknown"}
         </Badge>
 
         <StatusBadge
@@ -199,86 +199,228 @@ export default function SearchingRequest({
 
       </div>
 
-      {/* Main status */}
 
-      <div className="py-2 text-center">
+      {/* =================================================
+          SEARCHING STATE
+      ================================================= */}
 
-        <span
-          className={cn(
-            "mx-auto grid h-16 w-16 place-items-center rounded-full",
+      {!assigned &&
+        !noHospitalAvailable && (
+          <div className="mt-3 flex min-h-0 flex-1 flex-col">
 
-            noHospitalAvailable
-              ? "bg-red-50 text-red-600"
-              : assigned
-                ? "bg-primary text-on-primary"
-                : "bg-accent-soft text-accent-strong"
-          )}
-        >
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
-          {noHospitalAvailable ? (
-            <CircleAlert size={28} />
-          ) : assigned ? (
-            <Hospital size={28} />
-          ) : (
-            <LoaderCircle
-              size={28}
-              className="animate-spin"
-            />
-          )}
+              <div className="px-5 pb-5 pt-6 text-center">
 
-        </span>
+                <div
+                  className="
+                    mx-auto grid h-16 w-16
+                    place-items-center
+                    rounded-full
+                    bg-accent-soft
+                    text-accent-strong
+                  "
+                >
+                  <LoaderCircle
+                    size={27}
+                    className="animate-spin"
+                  />
+                </div>
 
-        <h3 className="mt-4 text-subtitle font-semibold text-ink">
+                <h3
+                  className="
+                    mt-4
+                    text-subtitle
+                    font-semibold
+                    text-ink
+                  "
+                >
+                  Finding a hospital
+                </h3>
 
-          {live?.status ===
-          "COMPLETED"
-            ? "Handover completed"
-            : noHospitalAvailable
-              ? "No hospital available"
-              : assigned
-                ? "Hospital assigned"
-                : "Finding a hospital"}
+                <p
+                  className="
+                    mx-auto mt-1
+                    max-w-[280px]
+                    text-caption
+                    leading-relaxed
+                    text-ink-muted
+                  "
+                >
+                  We're finding an available hospital
+                  that can handle this emergency.
+                </p>
 
-        </h3>
+              </div>
 
-        <p className="mx-auto mt-1 max-w-[300px] text-caption text-ink-muted">
 
-          {live?.status ===
-          "COMPLETED"
-            ? "The patient has been successfully handed over to the assigned hospital."
-            : noHospitalAvailable
-              ? "We couldn't find an available hospital that can handle the required resources right now."
-              : assigned
-                ? "A hospital has accepted your request. Proceed to the destination."
-                : "We're contacting nearby hospitals that can handle your requirements."}
+              {/* Searching status */}
 
-        </p>
+              <div
+                className="
+                  mx-5
+                  rounded-xl
+                  border border-line
+                  bg-workspace
+                  px-4 py-3
+                "
+              >
 
-      </div>
+                <div className="flex items-center gap-3">
 
-      {/* -----------------------------------------
-          No hospital available
-      ------------------------------------------ */}
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+
+                    <span
+                      className="
+                        absolute
+                        inline-flex
+                        h-full w-full
+                        animate-ping
+                        rounded-full
+                        bg-primary
+                        opacity-60
+                      "
+                    />
+
+                    <span
+                      className="
+                        relative
+                        flex h-2.5 w-2.5
+                        rounded-full
+                        bg-primary
+                      "
+                    />
+
+                  </span>
+
+                  <div>
+
+                    <p
+                      className="
+                        text-caption
+                        font-semibold
+                        text-ink
+                      "
+                    >
+                      Searching nearby
+                    </p>
+
+                    <p
+                      className="
+                        mt-0.5
+                        text-[11px]
+                        text-ink-muted
+                      "
+                    >
+                      Please stay at the emergency
+                      location.
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div className="flex-1" />
+
+
+              {/* Cancel */}
+
+              <div className="p-5">
+
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="
+                    w-full
+                    rounded-xl
+                    border border-line
+                    bg-card
+                    px-4 py-3
+                    text-caption
+                    font-semibold
+                    text-ink
+                    transition
+                    hover:bg-workspace
+                  "
+                >
+                  Cancel request
+                </button>
+
+              </div>
+
+            </Card>
+
+          </div>
+        )}
+
+
+      {/* =================================================
+          NO HOSPITAL AVAILABLE
+      ================================================= */}
 
       {noHospitalAvailable && (
-        <Card className="border border-line bg-workspace p-5 text-center">
+        <Card
+          className="
+            mt-3
+            flex
+            min-h-0
+            flex-1
+            flex-col
+            justify-between
+            border
+            border-line
+            bg-card
+            p-6
+            text-center
+          "
+        >
 
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-50 text-red-600">
-            <CircleAlert size={22} />
+          <div>
+
+            <div
+              className="
+                mx-auto grid h-14 w-14
+                place-items-center
+                rounded-full
+                bg-red-50
+                text-red-600
+              "
+            >
+              <CircleAlert size={25} />
+            </div>
+
+            <h3
+              className="
+                mt-4
+                text-subtitle
+                font-semibold
+                text-ink
+              "
+            >
+              No hospital available
+            </h3>
+
+            <p
+              className="
+                mx-auto mt-1
+                max-w-[290px]
+                text-caption
+                leading-relaxed
+                text-ink-muted
+              "
+            >
+              We couldn't find an available hospital
+              that can handle this emergency right now.
+            </p>
+
           </div>
-
-          <p className="mt-3 text-body font-semibold text-ink">
-            No hospital could accept this emergency
-          </p>
-
-          <p className="mt-1 text-caption text-ink-muted">
-            We contacted all suitable hospitals,
-            but none are currently available.
-          </p>
 
           <Button
             full
-            className="mt-4"
+            className="mt-8"
             onClick={onReset}
           >
             Try Again
@@ -287,236 +429,485 @@ export default function SearchingRequest({
         </Card>
       )}
 
-      {/* Progress steps */}
 
-      {!noHospitalAvailable && (
-        <ol className="space-y-2.5">
-
-          {STEPS.map((step) => {
-
-            const done =
-              step.done(
-                live?.status
-              );
-
-            return (
-              <li
-                key={step.label}
-                className={cn(
-                  "flex items-center gap-3 text-body font-medium",
-                  done
-                    ? "text-ink"
-                    : "text-ink-muted"
-                )}
-              >
-
-                <span
-                  className={cn(
-                    "grid h-6 w-6 place-items-center rounded-full",
-                    done
-                      ? "bg-primary text-on-primary"
-                      : "bg-workspace"
-                  )}
-                >
-
-                  {done && (
-                    <Check
-                      size={13}
-                      strokeWidth={3}
-                    />
-                  )}
-
-                </span>
-
-                {step.label}
-
-              </li>
-            );
-          })}
-
-        </ol>
-      )}
-
-      {/* -----------------------------------------
-          Assigned hospital
-      ------------------------------------------ */}
+      {/* =================================================
+          ASSIGNED HOSPITAL
+      ================================================= */}
 
       {assigned && (
-
         <Card
-          tone="primary"
-          className="p-4"
+          className="
+            mt-6
+            flex
+            min-h-0
+            flex-1
+            flex-col
+            overflow-hidden
+            bg-white
+          "
         >
 
-          <div className="flex items-start justify-between gap-3">
+          {/* =================================================
+              ASSIGNED HEADER
+          ================================================= */}
 
-            <div>
+          {!completed && (
+            <div className="shrink-0 px-5 pb-4 pt-8">
 
-              <p className="text-body font-semibold text-ink">
+              <div className="flex items-start gap-3">
 
-                {hospital?.name ||
-                  "Assigned hospital"}
+                <div
+                  className="
+                    grid h-11 w-11
+                    shrink-0
+                    place-items-center
+                    rounded-xl
+                    bg-primary
+                    text-on-primary
+                  "
+                >
+                  <Hospital size={21} />
+                </div>
 
-              </p>
+                <div className="min-w-0">
 
-              {hospital?.address && (
+                  <p
+                    className="
+                      text-caption
+                      font-medium
+                      text-ink-muted
+                    "
+                  >
+                    Hospital assigned
+                  </p>
 
-                <p className="mt-0.5 text-caption text-ink-soft">
-
-                  {hospital.address}
-
-                </p>
-
-              )}
-
-            </div>
-
-            {hospital?.phone && (
-
-              <a
-                href={`tel:${hospital.phone}`}
-                className="inline-flex shrink-0 items-center gap-2 rounded-field bg-card-dark px-3.5 py-2 text-caption font-semibold text-on-dark"
-              >
-
-                <Phone size={14} />
-
-                {hospital.phone}
-
-              </a>
-
-            )}
-
-          </div>
-
-          {/* --------------------------------------
-              Handover section
-          --------------------------------------- */}
-
-          {live?.status ===
-            "HOSPITAL_ASSIGNED" && (
-
-            <div className="mt-4 border-t border-line pt-4">
-
-              {/* Distance */}
-
-              <div className="flex items-center justify-between">
-
-                <div className="flex items-center gap-2">
-
-                  <MapPin
-                    size={15}
-                    className={
-                      canHandover
-                        ? "text-primary"
-                        : "text-ink-muted"
-                    }
-                  />
-
-                  <span className="text-caption font-medium text-ink">
-
-                    {distance !==
-                    null
-                      ? `${Math.round(
-                          distance *
-                            1000
-                        )} m away`
-                      : "Calculating distance..."}
-
-                  </span>
+                  <h3
+                    className="
+                      mt-0.5
+                      text-subtitle
+                      font-semibold
+                      text-ink
+                    "
+                  >
+                    Your destination is ready
+                  </h3>
 
                 </div>
 
-                {canHandover && (
+              </div>
 
-                  <span className="text-caption font-semibold text-primary">
-                    Hospital nearby
-                  </span>
 
+              <p
+                className="
+                  mt-5
+                  text-caption
+                  leading-relaxed
+                  text-ink-muted
+                "
+              >
+                A hospital has accepted this emergency.
+                Proceed to the assigned destination.
+              </p>
+
+            </div>
+          )}
+
+
+          {/* =================================================
+              HOSPITAL DETAILS
+          ================================================= */}
+
+          {!completed && hospital && (
+            <div
+              className="
+                mx-5
+                mb-6
+                rounded-xl
+                border
+                border-primary/20
+                bg-[#F7FBD9]
+                p-4
+              "
+            >
+
+              {/* Hospital identity */}
+
+              <div
+                className="
+                  flex
+                  items-start
+                  justify-between
+                  gap-4
+                "
+              >
+
+                <div className="min-w-0">
+
+                  <p
+                    className="
+                      text-body
+                      font-semibold
+                      text-ink
+                      truncate
+                    "
+                  >
+                    {hospital?.name ||
+                      "Assigned hospital"}
+                  </p>
+
+                  {hospital?.address && (
+                    <p
+                      className="
+                        mt-1
+                        text-caption
+                        text-ink-soft
+                        line-clamp-1
+                      "
+                    >
+                      {hospital.address}
+                    </p>
+                  )}
+
+                </div>
+
+
+                {/* Call */}
+
+                {hospital?.phone && (
+                  <a
+                    href={`tel:${hospital.phone}`}
+                    className="
+                      inline-flex
+                      shrink-0
+                      items-center
+                      gap-1.5
+                      rounded-lg
+                      bg-card-dark
+                      px-3 py-2
+                      text-[11px]
+                      font-semibold
+                      text-on-dark
+                      transition
+                      hover:opacity-90
+                    "
+                  >
+                    <Phone size={13} />
+                    Call
+                  </a>
                 )}
 
               </div>
 
-              {/* Complete Handover */}
 
-              <Button
-                full
-                className="mt-3"
-                disabled={
-                  !canHandover
-                }
-                onClick={() =>
-                  handleHandover(
-                    "ARRIVED"
-                  )
-                }
+              {/* Distance + ETA */}
+
+              <div
+                className="
+                  mt-5
+                  grid
+                  grid-cols-2
+                  gap-2
+                "
               >
 
-                {canHandover
-                  ? "Complete Handover"
-                  : "Reach hospital to handover"}
+                <div
+                  className="
+                    rounded-lg
+                    bg-workspace
+                    px-3 py-2.5
+                  "
+                >
 
-              </Button>
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-1.5
+                    "
+                  >
 
-              {/* Handover Anyway */}
+                    <MapPin
+                      size={14}
+                      className="text-primary"
+                    />
 
-              <button
-                type="button"
-                className="mt-3 w-full text-caption font-semibold text-ink-muted transition hover:text-ink"
-                onClick={() =>
-                  handleHandover(
-                    "ANYWAY"
-                  )
-                }
+                    <span
+                      className="
+                        text-[11px]
+                        text-ink-muted
+                      "
+                    >
+                      Distance
+                    </span>
+
+                  </div>
+
+                  <p
+                    className="
+                      mt-2
+                      text-body
+                      font-semibold
+                      text-ink
+                    "
+                  >
+                    {roadDistanceKm !== null
+                      ? `${roadDistanceKm.toFixed(1)} km`
+                      : "Calculating..."}
+                  </p>
+
+                </div>
+
+
+                <div
+                  className="
+                    rounded-lg
+                    bg-workspace
+                    px-3 py-2.5
+                  "
+                >
+
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-1.5
+                    "
+                  >
+
+                    <LoaderCircle
+                      size={14}
+                      className="text-primary"
+                    />
+
+                    <span
+                      className="
+                        text-[11px]
+                        text-ink-muted
+                      "
+                    >
+                      ETA
+                    </span>
+
+                  </div>
+
+                  <p
+                    className="
+                      mt-1
+                      text-body
+                      font-semibold
+                      text-ink
+                    "
+                  >
+                    {roadDurationMinutes !== null
+                      ? `${roadDurationMinutes} min`
+                      : "Calculating..."}
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              {/* Handover */}
+
+              <div
+                className="
+                  mt-6
+                  border-t
+                  border-line
+                  pt-3
+                "
               >
 
-                Handover Anyway
+                {canHandover && (
+                  <div
+                    className="
+                      mb-6
+                      flex
+                      items-center
+                      gap-2
+                      rounded-lg
+                      bg-primary/10
+                      px-3 py-2
+                    "
+                  >
 
-              </button>
+                    <Check
+                      size={14}
+                      className="text-primary"
+                    />
+
+                    <span
+                      className="
+                        text-[11px]
+                        font-semibold
+                        text-ink
+                      "
+                    >
+                      You have reached the hospital
+                    </span>
+
+                  </div>
+                )}
+
+
+                <Button
+                  full
+                  disabled={!canHandover}
+                  onClick={() =>
+                    handleHandover("ARRIVED")
+                  }
+                >
+                  {canHandover
+                    ? "Complete Handover"
+                    : "Reach hospital to handover"}
+                </Button>
+
+
+                <button
+                  type="button"
+                  className="
+                    mt-3
+                    w-full
+                    py-1
+                    text-[11px]
+                    font-semibold
+                    text-ink-muted
+                    transition
+                    hover:text-ink
+                  "
+                  onClick={() =>
+                    handleHandover("ANYWAY")
+                  }
+                >
+                  Handover Anyway
+                </button>
+
+              </div>
 
             </div>
-
           )}
 
-          {/* --------------------------------------
-              Completed handover
-          --------------------------------------- */}
 
-          {live?.status ===
-            "COMPLETED" && (
+          {/* =================================================
+              COMPLETED STATE
+          ================================================= */}
 
-            <div className="mt-4 rounded-field bg-workspace p-3 text-center">
+          {completed && (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex flex-1 flex-col items-center justify-center px-6 py-8">
+                {/* Success */}
 
-              <p className="text-body font-semibold text-ink">
-                Handover completed
-              </p>
+                <div
+                  className="
+                    grid h-16 w-16
+                    place-items-center
+                    rounded-full
+                    bg-primary
+                    text-on-primary
+                  "
+                >
+                  <Check
+                    size={30}
+                    strokeWidth={3}
+                  />
+                </div>
 
-              <p className="mt-1 text-caption text-ink-muted">
+                <h3 className="mt-5 text-xl font-semibold text-ink">
+                  Handover completed
+                </h3>
 
-                Patient successfully handed
-                over to{" "}
+                <p className="mt-2 max-w-[300px] text-center text-caption leading-relaxed text-ink-muted">
+                  Patient successfully handed over to{" "}
+                  <span className="font-semibold text-ink">
+                    {hospital?.name || "the assigned hospital"}
+                  </span>.
+                </p>
 
-                {hospital?.name ||
-                  "the assigned hospital"}.
+                {/* Useful completion details */}
 
-              </p>
+                <div
+                  className="
+                    mt-7 w-full max-w-[360px]
+                    rounded-xl border border-line
+                    bg-workspace px-4 py-4
+                    text-left
+                  "
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="
+                        grid h-9 w-9 shrink-0
+                        place-items-center
+                        rounded-lg
+                        bg-card
+                        text-primary
+                      "
+                    >
+                      <Hospital size={17} />
+                    </div>
 
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Destination
+                      </p>
+
+                      <p className="mt-1 truncate text-caption font-semibold text-ink">
+                        {hospital?.name || "Assigned hospital"}
+                      </p>
+
+                      {hospital?.address && (
+                        <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-soft">
+                          {hospital.address}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Emergency ID
+                      </p>
+
+                      <p className="mt-1 truncate text-caption font-semibold text-ink">
+                        {live?.id || "Unknown"}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Handover time
+                      </p>
+
+                      <p className="mt-1 truncate text-caption font-semibold text-ink">
+                        {formattedCompletedAt || "Completed"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* New emergency */}
+
+              <div className="shrink-0 p-5 pt-3">
+                <Button
+                  full
+                  onClick={onReset}
+                >
+                  + New emergency request
+                </Button>
+              </div>
             </div>
+          )}
 
+          {/* Keep the assigned state vertically balanced */}
+
+          {!completed && (
+            <div className="min-h-0 flex-1" />
           )}
 
         </Card>
-
-      )}
-
-      {/* Start a new emergency */}
-
-      {!noHospitalAvailable && (
-        <Button
-          full
-          onClick={onReset}
-        >
-          New request
-        </Button>
       )}
 
     </div>

@@ -2,6 +2,8 @@ import EmergencyRequest from '../models/EmergencyRequest.js';
 import { generateEmergencyId } from '../utils/counterService.js';
 import { parseEmergencyRequirements } from '../services/aiParserService.js';
 import { createHospitalBatch } from '../services/hospitalMatchingService.js';
+import HospitalEmergencyRequest from '../models/HospitalEmergencyRequest.js';
+import { getIO } from '../socket/socket.js';
 
 const EMERGENCY_TYPES = [
   'ROAD_ACCIDENT',
@@ -505,29 +507,16 @@ export const cancelEmergencyRequest = async (
   next
 ) => {
   try {
-    // ----------------------------------
-    // 1. Get authenticated ambulance ID
-    // ----------------------------------
-
     const ambulanceId = req.user?._id;
 
     if (!ambulanceId) {
       return res.status(401).json({
         success: false,
-        message:
-          'Authenticated ambulance ID is missing',
+        message: 'Authenticated ambulance ID is missing',
       });
     }
 
-    // ----------------------------------
-    // 2. Get emergency MongoDB _id
-    // ----------------------------------
-
     const { id } = req.params;
-
-    // ----------------------------------
-    // 3. Find request
-    // ----------------------------------
 
     const emergencyRequest =
       await EmergencyRequest.findById(id);
@@ -535,15 +524,11 @@ export const cancelEmergencyRequest = async (
     if (!emergencyRequest) {
       return res.status(404).json({
         success: false,
-        message:
-          'Emergency request not found',
+        message: 'Emergency request not found',
       });
     }
 
-    // ----------------------------------
-    // 4. Verify ownership
-    // ----------------------------------
-
+    // Verify ownership
     if (
       emergencyRequest.ambulanceId.toString() !==
       ambulanceId.toString()
@@ -555,36 +540,68 @@ export const cancelEmergencyRequest = async (
       });
     }
 
-    // ----------------------------------
-    // 5. Only PARSED requests can be cancelled
-    // ----------------------------------
+    // Only active/cancellable states
+    const cancellableStatuses = [
+      'PARSED',
+      'SEARCHING_HOSPITAL',
+      'HOSPITALS_PINGED',
+    ];
 
     if (
-      emergencyRequest.status !== 'PARSED'
+      !cancellableStatuses.includes(
+        emergencyRequest.status
+      )
     ) {
       return res.status(400).json({
         success: false,
         message:
-          'Only parsed emergency requests can be cancelled',
+          'This emergency request can no longer be cancelled',
       });
     }
 
-    // ----------------------------------
-    // 6. Mark request as cancelled
-    // ----------------------------------
-
-    emergencyRequest.status =
-      'CANCELLED';
-
-    // ----------------------------------
-    // 7. Save
-    // ----------------------------------
+    // Cancel emergency
+    emergencyRequest.status = 'CANCELLED';
 
     await emergencyRequest.save();
 
-    // ----------------------------------
-    // 8. Return updated request
-    // ----------------------------------
+    // Find all pending hospital requests first
+    const pendingHospitalRequests =
+      await HospitalEmergencyRequest.find({
+        emergencyId: emergencyRequest._id,
+        status: 'PENDING',
+      })
+        .select('_id hospitalId')
+        .populate({
+          path: 'hospitalId',
+          select: 'id',
+        });
+
+    // Cancel all pending hospital requests
+    await HospitalEmergencyRequest.updateMany(
+      {
+        emergencyId: emergencyRequest._id,
+        status: 'PENDING',
+      },
+      {
+        $set: {
+          status: 'CANCELLED',
+          respondedAt: new Date(),
+        },
+      }
+    );
+
+    // Notify affected hospitals in real time
+    const io = getIO();
+
+    for (const hospitalRequest of pendingHospitalRequests) {
+      io.to(`hospital:${hospitalRequest.hospitalId.id}`).emit(
+        'emergency:cancelled',
+        {
+          emergencyId: emergencyRequest.id,
+          hospitalRequestId: hospitalRequest._id.toString(),
+        }
+      );
+    }
 
     return res.status(200).json({
       success: true,

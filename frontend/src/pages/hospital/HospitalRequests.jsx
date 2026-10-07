@@ -52,41 +52,80 @@ const HospitalRequests = () => {
     }
   }, [data]);
 
-useEffect(() => {
-  const handleNewEmergency = (request) => {
-    console.log("🚨 New emergency received:", request);
+  useEffect(() => {
+    const handleNewEmergency = (request) => {
+      console.log("🚨 New emergency received:", request);
 
-    // Prevent duplicate alerts for the same request
-    if (seenRequests.current.has(request._id)) {
-      console.log("⚠️ Duplicate emergency ignored:", request._id);
-      return;
-    }
-
-    seenRequests.current.add(request._id);
-
-    console.log("🔔 Playing emergency alert");
-
-    playEmergencyAlert();
-
-    setRequests((previous) => {
-      if (previous.some((item) => item._id === request._id)) {
-        return previous;
+      // Prevent duplicate alerts for the same request
+      if (seenRequests.current.has(request._id)) {
+        console.log("⚠️ Duplicate emergency ignored:", request._id);
+        return;
       }
 
-      return [...previous, request].sort(
-        (a, b) =>
-          new Date(a.sentAt).getTime() -
-          new Date(b.sentAt).getTime()
+      seenRequests.current.add(request._id);
+
+      console.log("🔔 Playing emergency alert");
+
+      playEmergencyAlert();
+
+      setRequests((previous) => {
+        if (previous.some((item) => item._id === request._id)) {
+          return previous;
+        }
+
+        return [...previous, request].sort(
+          (a, b) =>
+            new Date(a.sentAt).getTime() -
+            new Date(b.sentAt).getTime()
+        );
+      });
+    };
+
+    socket.on("emergency:new", handleNewEmergency);
+
+
+    return () => {
+      socket.off("emergency:new", handleNewEmergency);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleEmergencyCancelled = (data) => {
+      console.log(
+        "🚨 Emergency cancelled:",
+        data
       );
-    });
-  };
 
-  socket.on("emergency:new", handleNewEmergency);
+      setRequests((prev) =>
+        prev.filter(
+          (request) =>
+            String(request._id) !==
+            String(data.hospitalRequestId)
+        )
+      );
 
-  return () => {
-    socket.off("emergency:new", handleNewEmergency);
-  };
-}, []);
+      setSelectedId((current) =>
+        String(current) ===
+          String(data.hospitalRequestId)
+          ? null
+          : current
+      );
+    };
+
+    socket.on(
+      "emergency:cancelled",
+      handleEmergencyCancelled
+    );
+
+    return () => {
+      socket.off(
+        "emergency:cancelled",
+        handleEmergencyCancelled
+      );
+    };
+  }, []);
 
   const [filter, setFilter] = useState("ALL");
   const [selectedId, setSelectedId] = useState(null);
