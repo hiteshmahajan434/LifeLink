@@ -19,14 +19,8 @@ export default function MapCard({
   routeLoading,
   routeError,
   error,
+  isRequestCollapsed = false,
 }) {
-  /*
-   * The assignment event may contain only
-   * partial hospital information.
-   *
-   * Resolve it against the nearby hospital
-   * list when possible.
-   */
   const resolvedRouteHospital = routeHospital
     ? hospitals.find(
         (hospital) =>
@@ -37,10 +31,6 @@ export default function MapCard({
       ) || routeHospital
     : null;
 
-  /*
-   * Assigned hospital becomes the route
-   * destination.
-   */
   const assignedPoint =
     resolvedRouteHospital && location
       ? toLatLng(resolvedRouteHospital)
@@ -71,9 +61,8 @@ export default function MapCard({
         </Badge>
       </div>
 
-      {/* Fixed map area */}
+      {/* Map */}
       <div className="relative min-h-0 flex-1">
-
         <LiveMap
           ambulance={location}
           hospitals={hospitals}
@@ -81,23 +70,23 @@ export default function MapCard({
           routeCoordinates={
             route?.coordinates || []
           }
+          isRequestCollapsed={
+            isRequestCollapsed
+          }
         />
 
-        {/* Location error */}
         {error && (
           <div className="absolute left-4 top-4 z-[500] max-w-xs rounded-field border border-critical/30 bg-card px-3.5 py-2.5 text-caption font-medium text-critical shadow-float">
             {error}
           </div>
         )}
 
-        {/* Routing error */}
         {routeError && (
           <div className="absolute left-4 top-4 z-[500] max-w-xs rounded-field border border-critical/30 bg-card px-3.5 py-2.5 text-caption font-medium text-critical shadow-float">
             {routeError}
           </div>
         )}
 
-        {/* Route loading */}
         {routeLoading && (
           <div className="absolute right-4 top-4 z-[500] rounded-field border border-line bg-card px-3 py-2 text-caption font-medium text-ink-muted shadow-card">
             {route
@@ -106,10 +95,8 @@ export default function MapCard({
           </div>
         )}
 
-        {/* Route information */}
         {assignedPoint && route && (
           <div className="absolute bottom-4 left-4 z-[500] flex items-center gap-3 rounded-card border border-line bg-card/95 p-3.5 shadow-float backdrop-blur">
-
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-field bg-primary-soft text-primary-strong">
               <Navigation size={18} />
             </span>
@@ -132,10 +119,8 @@ export default function MapCard({
                 min away
               </p>
             </div>
-
           </div>
         )}
-
       </div>
     </div>
   );

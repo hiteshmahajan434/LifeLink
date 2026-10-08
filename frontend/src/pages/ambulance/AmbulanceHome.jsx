@@ -1,5 +1,9 @@
 import { useState } from "react";
 
+import {
+  ChevronRight,
+} from "lucide-react";
+
 import useAmbulanceLocation from "../../hooks/useAmbulanceLocation";
 import useDrivingRoute from "../../hooks/useDrivingRoute";
 
@@ -16,41 +20,24 @@ const AmbulanceHome = () => {
   const [routeHospital, setRouteHospital] =
     useState(null);
 
-  /*
-   * Resolve the assigned hospital against the
-   * nearby hospitals list.
-   *
-   * Socket.IO may give us only partial hospital
-   * information, so prefer the complete object
-   * from the hospitals list when available.
-   */
+  const [isRequestCollapsed, setIsRequestCollapsed] =
+    useState(false);
+
   const resolvedRouteHospital = routeHospital
     ? hospitals.find(
-        (hospital) =>
-          String(hospital._id) ===
-            String(routeHospital._id) ||
-          String(hospital.id) ===
-            String(routeHospital.id)
-      ) || routeHospital
+      (hospital) =>
+        String(hospital._id) ===
+        String(routeHospital._id) ||
+        String(hospital.id) ===
+        String(routeHospital.id)
+    ) || routeHospital
     : null;
 
-  /*
-   * Assigned hospital becomes the route destination.
-   */
   const assignedPoint =
     resolvedRouteHospital && location
       ? toLatLng(resolvedRouteHospital)
       : null;
 
-  /*
-   * Calculate the driving route ONCE here.
-   *
-   * This route becomes the single source of truth
-   * for both:
-   *
-   * 1. MapCard
-   * 2. SearchingRequest
-   */
   const {
     route,
     loading: routeLoading,
@@ -67,25 +54,130 @@ const AmbulanceHome = () => {
         subtitle="Real-time ambulance dispatch & live hospital routing"
       />
 
-      <div className="grid h-[calc(100dvh-140px)] min-h-0 grid-cols-1 gap-6 px-6 pb-8 lg:px-8 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <div className="h-[calc(100dvh-140px)] min-h-0 px-6 pb-8 lg:px-8">
+        <div className="flex h-full min-h-0 gap-6">
 
-        <EmergencyRequestPanel
-          location={location}
-          hospitals={hospitals}
-          route={route}
-          onRouteChange={setRouteHospital}
-        />
+          {/* Request panel */}
+          <div
+            className="
+              relative
+              hidden
+              min-h-0
+              shrink-0
+              xl:block
+              overflow-hidden
+              rounded-card
+              transition-[width]
+              duration-[400ms]
+              ease-[cubic-bezier(0.4,0,0.2,1)]
+            "
+            style={{
+              width: isRequestCollapsed
+                ? "76px"
+                : "420px",
+            }}
+          >
 
-        <MapCard
-          location={location}
-          hospitals={hospitals}
-          routeHospital={routeHospital}
-          route={route}
-          routeLoading={routeLoading}
-          routeError={routeError}
-          error={error}
-        />
+            {/* Actual request card */}
+            <div
+              className="
+                absolute
+                inset-y-0
+                left-0
+                w-[420px]
+                transition-transform
+                duration-[400ms]
+                ease-[cubic-bezier(0.4,0,0.2,1)]
+              "
+              style={{
+                transform: isRequestCollapsed
+                  ? "translateX(-440px)"
+                  : "translateX(0)",
+              }}
+            >
+              <EmergencyRequestPanel
+                location={location}
+                hospitals={hospitals}
+                route={route}
+                onRouteChange={
+                  setRouteHospital
+                }
+                onCollapse={() =>
+                  setIsRequestCollapsed(true)
+                }
+              />
+            </div>
 
+            {/* Collapsed stripe */}
+            <div
+              className="
+                absolute
+                inset-y-0
+                left-0
+                w-[76px]
+                overflow-hidden
+                rounded-card
+                border
+                border-line
+                bg-card
+                shadow-card
+                transition-opacity
+                duration-200
+              "
+              style={{
+                opacity: isRequestCollapsed
+                  ? 1
+                  : 0,
+                pointerEvents:
+                  isRequestCollapsed
+                    ? "auto"
+                    : "none",
+              }}
+            >
+              {/* Expand button at top */}
+              <button
+                type="button"
+                aria-label="Expand emergency request panel"
+                onClick={() =>
+                  setIsRequestCollapsed(false)
+                }
+                className="
+                  grid
+                  h-16
+                  w-full
+                  place-items-center
+                  border-b
+                  border-line
+                  bg-card
+                  text-ink-muted
+                  transition-colors
+                  hover:bg-card-muted
+                  hover:text-ink
+                  active:scale-[0.98]
+                "
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Map */}
+          <div className="min-h-0 min-w-0 flex-1">
+            <MapCard
+              location={location}
+              hospitals={hospitals}
+              routeHospital={routeHospital}
+              route={route}
+              routeLoading={routeLoading}
+              routeError={routeError}
+              error={error}
+              isRequestCollapsed={
+                isRequestCollapsed
+              }
+            />
+          </div>
+
+        </div>
       </div>
     </>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ChevronLeft } from "lucide-react";
 
 import {
   createEmergencyRequest,
@@ -41,6 +41,7 @@ export default function EmergencyRequestPanel({
   hospitals = [],
   route,
   onRouteChange,
+  onCollapse,
 }) {
   const [step, setStep] = useState("form");
   const [request, setRequest] = useState(null);
@@ -61,22 +62,12 @@ export default function EmergencyRequestPanel({
   const [showLocationPicker, setShowLocationPicker] =
     useState(false);
 
-  /*
-   * Initialize emergency location from the ambulance's
-   * current GPS location.
-   *
-   * After the user manually selects a location, we don't
-   * overwrite it every time the ambulance moves.
-   */
   useEffect(() => {
     if (!emergencyLocation && location) {
       setEmergencyLocation(location);
     }
   }, [location, emergencyLocation]);
 
-  /*
-   * Restore active emergency after refresh/login.
-   */
   useEffect(() => {
     const restoreActiveEmergency = async () => {
       try {
@@ -97,7 +88,6 @@ export default function EmergencyRequestPanel({
 
         setRequest(activeEmergency);
 
-        // Restore the correct UI step
         if (
           activeEmergency.status === "PARSED"
         ) {
@@ -114,7 +104,6 @@ export default function EmergencyRequestPanel({
           setStep("searching");
         }
 
-        // Restore map destination
         if (
           activeEmergency.assignedHospital
         ) {
@@ -133,13 +122,6 @@ export default function EmergencyRequestPanel({
     restoreActiveEmergency();
   }, [onRouteChange]);
 
-  /*
-   * Listen for real-time emergency updates.
-   *
-   * Socket.IO handles:
-   * 1. Hospital assignment
-   * 2. No hospital available
-   */
   useEffect(() => {
     const handleEmergencyAssigned = (data) => {
       console.log(
@@ -211,8 +193,6 @@ export default function EmergencyRequestPanel({
         };
       });
 
-      // Remove any active route because
-      // there is no hospital destination.
       onRouteChange?.(null);
     };
 
@@ -256,9 +236,7 @@ export default function EmergencyRequestPanel({
     }
 
     setTypedTranscript(null);
-
     voice.clearTranscript();
-
     voice.startListening();
   };
 
@@ -279,10 +257,6 @@ export default function EmergencyRequestPanel({
       [field]: value,
     }));
   };
-
-  // ------------------------------------------------
-  // Shared async action handler
-  // ------------------------------------------------
 
   const run = async (
     action,
@@ -318,10 +292,6 @@ export default function EmergencyRequestPanel({
     }
   };
 
-  // ------------------------------------------------
-  // CREATE
-  // ------------------------------------------------
-
   const handleCreate = (event) => {
     event.preventDefault();
 
@@ -337,10 +307,6 @@ export default function EmergencyRequestPanel({
     const hasVoice =
       voiceTranscript.trim();
 
-    /*
-     * Only consider resources as provided if
-     * the user actually requested something.
-     */
     const hasResources =
       form.resources.icuBeds > 0 ||
       form.resources.traumaBeds > 0 ||
@@ -368,7 +334,6 @@ export default function EmergencyRequestPanel({
       async () => {
         const inputs = {};
 
-        // Text input
         if (
           form.description.trim()
         ) {
@@ -376,7 +341,6 @@ export default function EmergencyRequestPanel({
             form.description.trim();
         }
 
-        // Voice input
         if (
           voiceTranscript.trim()
         ) {
@@ -384,7 +348,6 @@ export default function EmergencyRequestPanel({
             voiceTranscript.trim();
         }
 
-        // Quick select
         const quickSelect = {};
 
         if (
@@ -401,13 +364,11 @@ export default function EmergencyRequestPanel({
             Number(form.patientCount);
         }
 
-        // Do NOT send empty/default resources
         if (hasResources) {
           quickSelect.requiredResources =
             form.resources;
         }
 
-        // Only send quickSelect if it contains something
         if (
           Object.keys(
             quickSelect
@@ -450,10 +411,6 @@ export default function EmergencyRequestPanel({
     );
   };
 
-  // ------------------------------------------------
-  // EDIT
-  // ------------------------------------------------
-
   const handleStartEdit = () => {
     const requirements =
       request?.confirmedRequirements ||
@@ -470,7 +427,6 @@ export default function EmergencyRequestPanel({
     );
 
     setError("");
-
     setStep("edit");
   };
 
@@ -548,16 +504,11 @@ export default function EmergencyRequestPanel({
         );
 
         setEditRequirements(null);
-
         setStep("review");
       },
       "Unable to update emergency requirements."
     );
   };
-
-  // ------------------------------------------------
-  // CANCEL / CONFIRM
-  // ------------------------------------------------
 
   const handleCancel = () =>
     run(
@@ -592,10 +543,6 @@ export default function EmergencyRequestPanel({
       "Unable to confirm emergency request."
     );
 
-  // ------------------------------------------------
-  // HANDOVER COMPLETE
-  // ------------------------------------------------
-
   const handleHandoverComplete = (
     completedEmergency
   ) => {
@@ -607,10 +554,6 @@ export default function EmergencyRequestPanel({
       null
     );
   };
-
-  // ------------------------------------------------
-  // RESET
-  // ------------------------------------------------
 
   const reset = () => {
     setRequest(null);
@@ -626,13 +569,9 @@ export default function EmergencyRequestPanel({
     });
 
     setTypedTranscript(null);
-
     voice.clearTranscript();
-
     setError("");
 
-    // Reset emergency location to
-    // current ambulance location
     setEmergencyLocation(
       location || null
     );
@@ -644,33 +583,45 @@ export default function EmergencyRequestPanel({
     setStep("form");
   };
 
-  // ------------------------------------------------
-  // RENDER
-  // ------------------------------------------------
-
-  // ------------------------------------------------
-  // RENDER
-  // ------------------------------------------------
-
   return (
     <>
       <Card className="flex h-full min-h-0 flex-col overflow-hidden p-0">
 
-        {/* Fixed header */}
+        {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 className="flex min-w-0 items-center gap-2.5 text-subtitle font-semibold text-ink">
-
             <span className="h-2 w-2 shrink-0 rounded-full bg-primary ring-4 ring-primary/30" />
 
             <span className="truncate">
               {STEP_TITLES[step]}
             </span>
-
           </h2>
+
+          {onCollapse && (
+            <button
+              type="button"
+              aria-label="Collapse emergency request panel"
+              onClick={onCollapse}
+              className="
+                grid h-9 w-9 shrink-0
+                place-items-center
+                rounded-field
+                border border-line
+                bg-card
+                text-ink-muted
+                transition-all duration-200
+                hover:bg-card-muted
+                hover:text-ink
+                active:scale-95
+              "
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
         </div>
 
         {/* Scrollable content */}
-<div className="min-h-0 flex-1 overflow-hidden p-5">
+        <div className="min-h-0 flex-1 overflow-hidden p-5">
 
           {step === "form" && (
             <CreateRequestForm

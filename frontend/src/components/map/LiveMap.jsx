@@ -23,17 +23,17 @@ import ambulanceImage from "../../assets/map/ambulance.png";
 import hospitalImage from "../../assets/map/hospital.png";
 
 const ambulanceIcon = L.icon({
-    iconUrl: ambulanceImage,
-    iconSize: [46, 46],
-    iconAnchor: [23, 23],
-    popupAnchor: [0, -23],
+  iconUrl: ambulanceImage,
+  iconSize: [46, 46],
+  iconAnchor: [23, 23],
+  popupAnchor: [0, -23],
 });
 
 const hospitalIcon = L.icon({
-    iconUrl: hospitalImage,
-    iconSize: [46, 46],
-    iconAnchor: [23, 23],
-    popupAnchor: [0, -23],
+  iconUrl: hospitalImage,
+  iconSize: [46, 46],
+  iconAnchor: [23, 23],
+  popupAnchor: [0, -23],
 });
 
 const FALLBACK_CENTER = [
@@ -41,13 +41,6 @@ const FALLBACK_CENTER = [
   73.8567,
 ];
 
-/**
- * Frames the map initially and when the
- * assigned hospital changes.
- *
- * It deliberately does not recenter the
- * map whenever the ambulance GPS changes.
- */
 function FitToPoints({
   ambulance,
   target,
@@ -75,12 +68,6 @@ function FitToPoints({
           target.longitude
       );
 
-    /*
-     * Fit the map:
-     * - when GPS becomes available for
-     *   the first time
-     * - when the assigned hospital changes
-     */
     if (
       !hasInitialFit.current ||
       targetChanged
@@ -131,8 +118,66 @@ export default function LiveMap({
   hospitals = [],
   routeTarget,
   routeCoordinates = [],
+  isRequestCollapsed = false,
 }) {
   const mapRef = useRef(null);
+
+  /*
+   * Leaflet needs to recalculate its container
+   * dimensions when the request panel changes width.
+   *
+   * ResizeObserver also catches the actual flex
+   * layout transition while it is happening.
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map) {
+      return;
+    }
+
+    let frameId = null;
+
+    const container = map.getContainer();
+
+    const observer = new ResizeObserver(() => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = requestAnimationFrame(() => {
+        map.invalidateSize({
+          animate: false,
+          pan: false,
+        });
+      });
+    });
+
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, []);
+
+  /*
+   * Ensure a final Leaflet resize after the
+   * collapse/expand animation completes.
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      mapRef.current?.invalidateSize({
+        animate: false,
+        pan: false,
+      });
+    }, 430);
+
+    return () => clearTimeout(timer);
+  }, [isRequestCollapsed]);
 
   const zoomBtn =
     "grid h-9 w-9 place-items-center rounded-field border border-line bg-card text-ink shadow-card hover:bg-card-muted";
@@ -158,7 +203,6 @@ export default function LiveMap({
           target={routeTarget}
         />
 
-        {/* Ambulance */}
         {ambulance && (
           <Marker
             position={[
@@ -169,7 +213,6 @@ export default function LiveMap({
           />
         )}
 
-        {/* Hospitals */}
         {hospitals.map((hospital) => {
           const [
             longitude,
@@ -200,7 +243,6 @@ export default function LiveMap({
           );
         })}
 
-        {/* Road route casing */}
         {routeCoordinates.length > 0 && (
           <Polyline
             positions={routeCoordinates}
@@ -214,7 +256,6 @@ export default function LiveMap({
           />
         )}
 
-        {/* Road route */}
         {routeCoordinates.length > 0 && (
           <Polyline
             positions={routeCoordinates}
